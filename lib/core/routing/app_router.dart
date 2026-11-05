@@ -54,9 +54,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         case AuthStatus.needsOnboarding:
           return path == Routes.onboarding ? null : Routes.onboarding;
         case AuthStatus.loggedOut:
-          return _authRoutes.contains(path) && path != Routes.onboarding
+          return _authRoutes.contains(path) &&
+                  path != Routes.onboarding &&
+                  path != Routes.profileSetup
               ? null
               : Routes.login;
+        case AuthStatus.needsProfile:
+          return path == Routes.profileSetup ? null : Routes.profileSetup;
         case AuthStatus.loggedIn:
           return _authRoutes.contains(path) ? Routes.home : null;
       }
@@ -80,8 +84,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.profileSetup,
-        builder: (context, state) =>
-            ProfileSetupScreen(args: state.extra as ProfileSetupArgs),
+        builder: (context, state) => const ProfileSetupScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => MainShell(shell: shell),

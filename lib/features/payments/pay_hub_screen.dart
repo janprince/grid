@@ -7,6 +7,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/widgets.dart';
 import 'widgets/transaction_receipt_sheet.dart';
@@ -16,7 +17,6 @@ class PayHubScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final accounts = ref.watch(accountsProvider);
     final savedHighlights = _highlights(accounts);
     final recentPayments = ref
@@ -26,32 +26,11 @@ class PayHubScreen extends ConsumerWidget {
         .toList();
 
     return Scaffold(
+      appBar: const AppHeader(title: 'Pay bills'),
       body: SafeArea(
+        top: false,
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  Insets.xl,
-                  Insets.lg,
-                  Insets.xl,
-                  0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pay bills', style: theme.textTheme.headlineLarge),
-                    Gaps.xs,
-                    Text(
-                      'Every utility for your home, in one place.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.inkMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             if (savedHighlights.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: SectionHeader(
@@ -62,7 +41,7 @@ class PayHubScreen extends ConsumerWidget {
               ),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 132,
+                  height: 128,
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
                     scrollDirection: Axis.horizontal,
@@ -75,17 +54,17 @@ class PayHubScreen extends ConsumerWidget {
               ),
             ],
             const SliverToBoxAdapter(child: SectionHeader(title: 'Utilities')),
+            // Rows, not a 2-column grid. Eight tiles that differed only by
+            // glyph colour were unscannable; a list lets each biller's own
+            // mark carry the row.
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
-              sliver: SliverGrid.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: Insets.md,
-                crossAxisSpacing: Insets.md,
-                childAspectRatio: 1.55,
-                children: [
-                  for (final type in UtilityType.values)
-                    _UtilityTile(type: type, accounts: accounts),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: Insets.md),
+              sliver: SliverList.builder(
+                itemCount: UtilityType.values.length,
+                itemBuilder: (context, i) => _UtilityRow(
+                  type: UtilityType.values[i],
+                  accounts: accounts,
+                ),
               ),
             ),
             if (recentPayments.isNotEmpty) ...[
@@ -98,14 +77,13 @@ class PayHubScreen extends ConsumerWidget {
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
-                  Insets.xl,
+                  Insets.md,
                   0,
-                  Insets.xl,
+                  Insets.md,
                   Insets.xxxl,
                 ),
-                sliver: SliverList.separated(
+                sliver: SliverList.builder(
                   itemCount: recentPayments.length,
-                  separatorBuilder: (_, _) => Gaps.md,
                   itemBuilder: (context, i) =>
                       _RecentPaymentTile(tx: recentPayments[i]),
                 ),
@@ -139,6 +117,8 @@ class PayHubScreen extends ConsumerWidget {
   }
 }
 
+/// The one place on this screen that is allowed to float — a short
+/// horizontal run of the accounts you actually return to.
 class _SavedAccountCard extends StatelessWidget {
   const _SavedAccountCard({required this.account});
 
@@ -151,8 +131,10 @@ class _SavedAccountCard extends StatelessWidget {
     final dueSoon = due != null && due.difference(DateTime.now()).inDays <= 3;
 
     return SizedBox(
-      width: 210,
+      width: 208,
       child: AppCard(
+        variant: AppCardVariant.raised,
+        border: Border.all(color: AppColors.line),
         padding: const EdgeInsets.all(Insets.lg),
         borderRadius: Corners.lgRadius,
         onTap: () => context.push(
@@ -163,7 +145,7 @@ class _SavedAccountCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                TintedIcon(account.type.icon, size: 34),
+                BillerMark(account.type, size: 34),
                 const Spacer(),
                 if (dueSoon)
                   const StatusBadge(label: 'Due soon', tone: BadgeTone.warning)
@@ -186,7 +168,7 @@ class _SavedAccountCard extends StatelessWidget {
                   ? Fmt.lastPaidLabel(account.lastPaidAt!)
                   : Fmt.masked(account.accountNumber),
               style: theme.textTheme.labelSmall?.copyWith(
-                color: dueSoon ? AppColors.warning : AppColors.inkFaint,
+                color: dueSoon ? AppColors.warning : AppColors.faint,
               ),
             ),
           ],
@@ -196,8 +178,8 @@ class _SavedAccountCard extends StatelessWidget {
   }
 }
 
-class _UtilityTile extends StatelessWidget {
-  const _UtilityTile({required this.type, required this.accounts});
+class _UtilityRow extends StatelessWidget {
+  const _UtilityRow({required this.type, required this.accounts});
 
   final UtilityType type;
   final List<UtilityAccount> accounts;
@@ -207,34 +189,49 @@ class _UtilityTile extends StatelessWidget {
     final theme = Theme.of(context);
     final saved = accounts.where((a) => a.type == type).length;
 
-    return AppCard(
-      padding: const EdgeInsets.all(Insets.lg),
-      borderRadius: Corners.lgRadius,
+    return InkWell(
       onTap: () => context.push(Routes.payFlow(type.name)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          TintedIcon(type.icon, size: 36),
-          Gaps.sm,
-          Text(
-            type.label,
-            style: theme.textTheme.titleMedium,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            saved > 0
-                ? '$saved saved account${saved == 1 ? '' : 's'}'
-                : type.tagline,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppColors.inkFaint,
+      borderRadius: Corners.rowRadius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Insets.sm,
+          vertical: Insets.md,
+        ),
+        child: Row(
+          children: [
+            BillerMark(type),
+            Gaps.md,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    type.label,
+                    style: theme.textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    saved > 0
+                        ? '$saved saved account${saved == 1 ? '' : 's'}'
+                        : type.tagline,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.faint,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.faint,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -248,58 +245,61 @@ class _RecentPaymentTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return AppCard(
-      padding: const EdgeInsets.all(Insets.lg),
+    return InkWell(
       onTap: () => showTransactionSheet(context, tx),
-      child: Row(
-        children: [
-          TintedIcon(tx.type.icon),
-          Gaps.md,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.accountNickname,
-                  style: theme.textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${Fmt.cedis(tx.amount)} • ${Fmt.relativeDay(tx.createdAt)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.inkMuted,
+      borderRadius: Corners.rowRadius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Insets.sm,
+          vertical: Insets.md,
+        ),
+        child: Row(
+          children: [
+            BillerMark(tx.type),
+            Gaps.md,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tx.accountNickname,
+                    style: theme.textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '${Fmt.cedis(tx.amount)} · '
+                    '${Fmt.relativeDay(tx.createdAt)}',
+                    style: theme.textTheme.bodySmall?.tabular.copyWith(
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Gaps.sm,
-          OutlinedButton(
-            onPressed: () {
-              final account = ref
-                  .read(accountsProvider)
-                  .where(
-                    (a) =>
-                        a.type == tx.type &&
-                        a.accountNumber == tx.accountNumber,
-                  )
-                  .firstOrNull;
-              context.push(
-                account == null
-                    ? Routes.payFlow(tx.type.name)
-                    : '${Routes.payFlow(tx.type.name)}?account=${account.id}',
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 40),
-              padding: const EdgeInsets.symmetric(horizontal: Insets.lg),
-              textStyle: theme.textTheme.labelMedium,
+            Gaps.sm,
+            SecondaryButton(
+              label: 'Pay again',
+              onPressed: () {
+                final account = ref
+                    .read(accountsProvider)
+                    .where(
+                      (a) =>
+                          a.type == tx.type &&
+                          a.accountNumber == tx.accountNumber,
+                    )
+                    .firstOrNull;
+                context.push(
+                  account == null
+                      ? Routes.payFlow(tx.type.name)
+                      : '${Routes.payFlow(tx.type.name)}?account=${account.id}',
+                );
+              },
+              expand: false,
             ),
-            child: const Text('Pay again'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

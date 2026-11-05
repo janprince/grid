@@ -43,7 +43,7 @@ class _SkeletonState extends State<Skeleton>
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: AppColors.surfaceDim,
+          color: AppColors.surfaceSubtle,
           borderRadius: widget.borderRadius,
         ),
       ),
@@ -63,9 +63,9 @@ class SkeletonCard extends StatelessWidget {
       height: height,
       padding: const EdgeInsets.all(Insets.lg),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: AppColors.surface,
         borderRadius: Corners.xlRadius,
-        boxShadow: AppColors.cardShadow,
+        boxShadow: AppColors.raisedShadow,
       ),
       child: Row(
         children: const [

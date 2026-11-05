@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'payment.dart';
 import 'service_request.dart';
+import 'utility_type.dart';
 
 enum ActivityKind { payment, service }
 
@@ -16,6 +17,7 @@ class ActivityItem {
     required this.subtitle,
     required this.date,
     required this.statusLabel,
+    this.utilityType,
     this.amount,
     this.propertyLabel,
     this.transaction,
@@ -36,6 +38,7 @@ class ActivityItem {
       TransactionStatus.pending => 'Pending',
       TransactionStatus.failed => 'Failed',
     },
+    utilityType: tx.type,
     amount: tx.amount,
     propertyLabel: tx.propertyLabel,
     transaction: tx,
@@ -61,6 +64,11 @@ class ActivityItem {
   final String subtitle;
   final DateTime date;
   final String statusLabel;
+
+  /// Set for payments, so the row can carry the biller's own mark. Null for
+  /// service requests, which are GRID's own dispatch rather than a biller.
+  final UtilityType? utilityType;
+
   final double? amount;
   final String? propertyLabel;
   final PaymentTransaction? transaction;

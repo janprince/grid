@@ -41,26 +41,32 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.forestDeep,
-      body: Center(
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const GridLogo(size: 88, onDark: true),
-              Gaps.xxl,
-              const GridWordmark(fontSize: 34, onDark: true),
-              Gaps.md,
-              Text(
-                'The operating system for your home',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.onForestMuted,
-                ),
+      backgroundColor: AppColors.navyDeep,
+      body: Stack(
+        children: [
+          const GridTexture(opacity: 1.2, cell: 32),
+          Center(
+            child: FadeTransition(
+              opacity: CurvedAnimation(
+                parent: _controller,
+                curve: Curves.easeOut,
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const GridWordmark(fontSize: 34, onDark: true),
+                  Gaps.md,
+                  Text(
+                    'The operating system for your home',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.onNavyMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

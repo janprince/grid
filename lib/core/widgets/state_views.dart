@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import 'system.dart';
 
 /// Generic something-went-wrong view with a retry action.
 class ErrorView extends StatelessWidget {
@@ -29,7 +30,7 @@ class ErrorView extends StatelessWidget {
               width: 84,
               height: 84,
               decoration: const BoxDecoration(
-                color: AppColors.dangerSoft,
+                color: AppColors.dangerBg,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -45,16 +46,16 @@ class ErrorView extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.inkMuted,
+                color: AppColors.muted,
               ),
             ),
             if (onRetry != null) ...[
               Gaps.xxl,
-              OutlinedButton.icon(
+              SecondaryButton(
+                label: 'Try again',
                 onPressed: onRetry,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                label: const Text('Try again'),
+                expand: false,
+                icon: Icons.refresh_rounded,
               ),
             ],
           ],

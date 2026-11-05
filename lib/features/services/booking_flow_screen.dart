@@ -7,8 +7,8 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/utils/validators.dart';
 import '../../core/widgets/widgets.dart';
 
 class BookingArgs {
@@ -27,7 +27,7 @@ const _timeSlots = [
   '3:00 PM – 5:00 PM',
 ];
 
-/// Book a home service: category → problem details → schedule → review.
+/// Book a service: which service → what to do → where and when → review.
 class BookingFlowScreen extends ConsumerStatefulWidget {
   const BookingFlowScreen({super.key, this.initialCategory, this.args});
 
@@ -48,7 +48,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
   String? _issue;
   final _descriptionCtrl = TextEditingController();
   final _detailsForm = GlobalKey<FormState>();
-  int _photos = 0;
+  final int _photos = 0;
   String? _propertyId;
   ServiceUrgency _urgency = ServiceUrgency.standard;
   int _dayOffset = 0; // 0 = today, 1 = tomorrow, 2 = day after
@@ -61,7 +61,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     super.initState();
     _category = widget.args?.category ?? widget.initialCategory;
     _urgency = widget.args?.urgency ?? ServiceUrgency.standard;
-    _propertyId = ref.read(selectedPropertyIdProvider);
+    _propertyId = ref.read(selectedPropertyProvider)?.id;
     if (_category != null) _step = 1;
   }
 
@@ -78,7 +78,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     _ => true,
   };
 
-  double get _calloutFee => (_category?.calloutFee ?? 0) + _urgency.surcharge;
+  double get _estimate => (_category?.fromPrice ?? 0) + _urgency.surcharge;
 
   void _back() {
     if (_phase != _Phase.steps) {
@@ -93,9 +93,6 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
   }
 
   void _continue() {
-    if (_step == 1 && !(_detailsForm.currentState?.validate() ?? false)) {
-      return;
-    }
     if (_step < _stepCount - 1) {
       setState(() => _step++);
     } else {
@@ -147,14 +144,14 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     }
 
     return StepFlowScaffold(
-      title: 'Request a service',
+      title: 'Book a service',
       subtitle: _category?.label,
       step: _step,
       stepCount: _stepCount,
       onBack: _back,
-      bottomBar: FilledButton(
+      bottomBar: PrimaryButton(
+        label: _step == _stepCount - 1 ? 'Confirm request' : 'Continue',
         onPressed: _canContinue ? _continue : null,
-        child: Text(_step == _stepCount - 1 ? 'Confirm request' : 'Continue'),
       ),
       child: StepTransition(
         stepKey: _step,
@@ -171,120 +168,70 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     );
   }
 
-  // Step 1 — category ---------------------------------------------------------
+  // Step 1 — service ----------------------------------------------------------
 
-  Widget _buildCategoryStep() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'What do you need help with?',
-          style: theme.textTheme.headlineMedium,
+  Widget _buildCategoryStep() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text('What do you need?', style: AppText.headline),
+      Gaps.xl,
+      for (final category in ServiceCategory.values) ...[
+        ServiceCard(
+          category: category,
+          selected: _category == category,
+          onTap: () => setState(() {
+            if (_category != category) _issue = null;
+            _category = category;
+          }),
         ),
-        Gaps.xl,
-        for (final category in ServiceCategory.values) ...[
-          SelectionTile(
-            selected: _category == category,
-            onTap: () => setState(() {
-              _category = category;
-              _issue = null;
-            }),
-            title: category.label,
-            subtitle: category.description,
-            leading: TintedIcon(category.icon, size: 40),
-          ),
-          Gaps.md,
-        ],
+        Gaps.md,
       ],
-    );
-  }
+    ],
+  );
 
-  // Step 2 — issue & description ----------------------------------------------
+  // Step 2 — what to do -------------------------------------------------------
 
   Widget _buildDetailsStep() {
-    final theme = Theme.of(context);
     final category = _category!;
-
     return Form(
       key: _detailsForm,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Tell us about the problem',
-            style: theme.textTheme.headlineMedium,
+            category == ServiceCategory.cleaning
+                ? 'What kind of clean?'
+                : 'What should we do with your items?',
+            style: AppText.headline,
           ),
           Gaps.sm,
           Text(
-            'This helps us send the right professional with the right tools.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.inkMuted,
+            'Pick one. Your professional confirms the price before they '
+            'start.',
+            style: AppText.bodyMuted,
+          ),
+          Gaps.xl,
+          for (final issue in category.issues) ...[
+            SelectionTile(
+              selected: _issue == issue,
+              onTap: () => setState(() => _issue = issue),
+              title: issue,
             ),
-          ),
-          Gaps.xl,
-          Text('Common issues', style: theme.textTheme.titleMedium),
-          Gaps.md,
-          Wrap(
-            spacing: Insets.sm,
-            runSpacing: Insets.sm,
-            children: [
-              for (final issue in category.issues)
-                ChoiceChip(
-                  label: Text(issue),
-                  selected: _issue == issue,
-                  onSelected: (_) => setState(() => _issue = issue),
-                  selectedColor: AppColors.forestDeep,
-                  labelStyle: theme.textTheme.labelMedium?.copyWith(
-                    color: _issue == issue ? Colors.white : AppColors.ink,
-                  ),
-                  backgroundColor: AppColors.card,
-                  side: BorderSide(
-                    color: _issue == issue
-                        ? AppColors.forestDeep
-                        : AppColors.outline,
-                  ),
-                  showCheckmark: false,
-                ),
-            ],
-          ),
-          Gaps.xl,
+            Gaps.sm,
+          ],
+          Gaps.lg,
           TextFormField(
             controller: _descriptionCtrl,
-            maxLines: 4,
+            maxLines: 3,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Describe the problem',
-              hintText:
-                  'e.g. Half of the living room lost power after a '
-                  'loud pop last night.',
+            decoration: InputDecoration(
+              labelText: 'Anything we should know? (optional)',
+              hintText: category == ServiceCategory.cleaning
+                  ? 'e.g. 3 bedrooms, focus on the kitchen. Supplies are in '
+                        'the store room.'
+                  : 'e.g. About 15 items. Shirts on hangers, please.',
               alignLabelWithHint: true,
             ),
-            validator: (v) =>
-                Validators.notEmpty(v, label: 'A short description'),
-          ),
-          Gaps.xl,
-          Text('Add photos (optional)', style: theme.textTheme.titleMedium),
-          Gaps.sm,
-          Text(
-            'A photo of the issue speeds up diagnosis.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.inkFaint,
-            ),
-          ),
-          Gaps.md,
-          Row(
-            children: [
-              for (var i = 0; i < _photos; i++) ...[
-                _PhotoThumb(
-                  index: i,
-                  onRemove: () => setState(() => _photos--),
-                ),
-                Gaps.md,
-              ],
-              if (_photos < 3)
-                _AddPhotoBox(onTap: () => setState(() => _photos++)),
-            ],
           ),
         ],
       ),
@@ -301,7 +248,12 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Where and when?', style: theme.textTheme.headlineMedium),
+        Text(
+          _category == ServiceCategory.laundry
+              ? 'Where and when should we pick up?'
+              : 'Where and when?',
+          style: AppText.headline,
+        ),
         Gaps.xl,
         Text('Location', style: theme.textTheme.titleMedium),
         Gaps.md,
@@ -316,7 +268,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
           Gaps.md,
         ],
         Gaps.lg,
-        Text('Urgency', style: theme.textTheme.titleMedium),
+        Text('How soon', style: theme.textTheme.titleMedium),
         Gaps.md,
         for (final urgency in ServiceUrgency.values) ...[
           SelectionTile(
@@ -324,14 +276,11 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
             onTap: () => setState(() => _urgency = urgency),
             title: urgency.label,
             subtitle: urgency.description,
-            accent: urgency == ServiceUrgency.emergency
-                ? AppColors.danger
-                : AppColors.forest,
             trailing: urgency.surcharge > 0
                 ? Text(
                     '+${Fmt.cedis(urgency.surcharge)}',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppColors.inkMuted,
+                      color: AppColors.muted,
                     ),
                   )
                 : null,
@@ -344,18 +293,17 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
         Row(
           children: [
             for (var offset = 0; offset < 3; offset++) ...[
-              Expanded(
-                child: _DayChip(
-                  label: switch (offset) {
-                    0 => 'Today',
-                    1 => 'Tomorrow',
-                    _ => Fmt.date(
-                      now.add(const Duration(days: 2)),
-                    ).split(' ').take(2).join(' '),
-                  },
-                  selected: _dayOffset == offset,
-                  onTap: () => setState(() => _dayOffset = offset),
-                ),
+              GridChip(
+                expand: true,
+                label: switch (offset) {
+                  0 => 'Today',
+                  1 => 'Tomorrow',
+                  _ => Fmt.date(
+                    now.add(const Duration(days: 2)),
+                  ).split(' ').take(2).join(' '),
+                },
+                selected: _dayOffset == offset,
+                onTap: () => setState(() => _dayOffset = offset),
               ),
               if (offset < 2) Gaps.sm,
             ],
@@ -369,21 +317,10 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
           runSpacing: Insets.sm,
           children: [
             for (final slot in _timeSlots)
-              ChoiceChip(
-                label: Text(slot),
+              GridChip(
+                label: slot,
                 selected: _timeSlot == slot,
-                onSelected: (_) => setState(() => _timeSlot = slot),
-                selectedColor: AppColors.forestDeep,
-                labelStyle: theme.textTheme.labelMedium?.copyWith(
-                  color: _timeSlot == slot ? Colors.white : AppColors.ink,
-                ),
-                backgroundColor: AppColors.card,
-                side: BorderSide(
-                  color: _timeSlot == slot
-                      ? AppColors.forestDeep
-                      : AppColors.outline,
-                ),
-                showCheckmark: false,
+                onTap: () => setState(() => _timeSlot = slot),
               ),
           ],
         ),
@@ -407,7 +344,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Review your request', style: theme.textTheme.headlineMedium),
+        Text('Review your request', style: AppText.headline),
         Gaps.xl,
         AppCard(
           padding: const EdgeInsets.all(Insets.xl),
@@ -416,7 +353,7 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
             children: [
               Row(
                 children: [
-                  TintedIcon(category.icon),
+                  ServiceBadge(category: category),
                   Gaps.md,
                   Expanded(
                     child: Column(
@@ -429,54 +366,47 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
                         Text(
                           _issue ?? '',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkMuted,
+                            color: AppColors.muted,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  if (_urgency == ServiceUrgency.emergency)
-                    const StatusBadge(
-                      label: 'Emergency',
-                      tone: BadgeTone.danger,
-                    ),
                 ],
               ),
               Gaps.lg,
               const DashedDivider(),
               Gaps.sm,
-              ReceiptRow(label: 'Problem', value: _descriptionCtrl.text.trim()),
+              if (_descriptionCtrl.text.trim().isNotEmpty)
+                ReceiptRow(label: 'Notes', value: _descriptionCtrl.text.trim()),
               if (property != null)
                 ReceiptRow(
                   label: 'Location',
                   value:
                       '${property.nickname} — ${property.address}, ${property.city}',
                 ),
-              ReceiptRow(label: 'Urgency', value: _urgency.label),
+              ReceiptRow(label: 'How soon', value: _urgency.label),
               ReceiptRow(
                 label: 'Preferred time',
                 value: '${Fmt.relativeDay(date)}, $_timeSlot',
               ),
-              if (_photos > 0)
-                ReceiptRow(label: 'Photos', value: '$_photos attached'),
               const Divider(height: Insets.xl),
               ReceiptRow(
-                label: 'Call-out fee',
-                value: _calloutFee > 0
-                    ? Fmt.cedis(_calloutFee)
-                    : 'Quoted after details',
+                label: 'Price',
+                value: 'From ${Fmt.cedis(_estimate)}',
                 emphasize: true,
               ),
             ],
           ),
         ),
         Gaps.lg,
-        const InfoBanner(
+        InfoBanner(
           icon: Icons.receipt_long_rounded,
-          message:
-              'Transparent pricing — the call-out fee covers inspection '
-              'and diagnosis. You approve the final quote before any work '
-              'starts.',
+          message: category == ServiceCategory.laundry
+              ? 'The final price is confirmed when your items are collected. '
+                    'You pay once they are delivered.'
+              : 'Your cleaner confirms the price when they arrive. You pay '
+                    'once the job is done.',
         ),
       ],
     );
@@ -484,123 +414,6 @@ class _BookingFlowScreenState extends ConsumerState<BookingFlowScreen> {
 }
 
 // ---------------------------------------------------------------------------
-
-class _DayChip extends StatelessWidget {
-  const _DayChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.forestDeep : AppColors.card,
-      borderRadius: Corners.mdRadius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: Insets.md),
-          decoration: BoxDecoration(
-            borderRadius: Corners.mdRadius,
-            border: Border.all(
-              color: selected ? AppColors.forestDeep : AppColors.outline,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: selected ? Colors.white : AppColors.ink,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddPhotoBox extends StatelessWidget {
-  const _AddPhotoBox({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceDim,
-      borderRadius: Corners.mdRadius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          onTap();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Photo attached (simulated upload)')),
-          );
-        },
-        child: Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            borderRadius: Corners.mdRadius,
-            border: Border.all(color: AppColors.outline),
-          ),
-          child: const Icon(
-            Icons.add_a_photo_outlined,
-            color: AppColors.inkFaint,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PhotoThumb extends StatelessWidget {
-  const _PhotoThumb({required this.index, required this.onRemove});
-
-  final int index;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            color: AppColors.tealSoft,
-            borderRadius: Corners.mdRadius,
-          ),
-          child: const Icon(Icons.image_rounded, color: AppColors.teal),
-        ),
-        Positioned(
-          top: -6,
-          right: -6,
-          child: Material(
-            color: AppColors.ink,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onRemove,
-              child: const Padding(
-                padding: EdgeInsets.all(4),
-                child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _SubmittingView extends StatelessWidget {
   const _SubmittingView();
@@ -620,19 +433,16 @@ class _SubmittingView extends StatelessWidget {
                 height: 56,
                 child: CircularProgressIndicator(
                   strokeWidth: 3,
-                  color: AppColors.forest,
+                  color: AppColors.navy,
                 ),
               ),
               Gaps.xxl,
-              Text(
-                'Submitting your request',
-                style: theme.textTheme.headlineSmall,
-              ),
+              Text('Sending your request', style: AppText.title),
               Gaps.sm,
               Text(
-                'Matching you with vetted professionals…',
+                'Matching you with a vetted professional…',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.inkMuted,
+                  color: AppColors.muted,
                 ),
               ),
             ],
@@ -650,96 +460,63 @@ class _ConfirmationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) context.go(Routes.home);
       },
-      child: Scaffold(
-        body: SafeArea(
-          child: SingleChildScrollView(
+      // Shares the payment outcome treatment, so booking a clean ends on
+      // a screen as considered as buying power does.
+      child: OutcomeScaffold(
+        tone: OutcomeTone.success,
+        headline: 'Request received',
+        figure: request.reference,
+        message: 'Track it any time in Activity.',
+        content: [
+          AppCard(
             padding: const EdgeInsets.all(Insets.xl),
             child: Column(
               children: [
-                Gaps.xxxl,
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: const BoxDecoration(
-                    color: AppColors.successSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 42,
-                    color: AppColors.success,
-                  ),
+                ReceiptRow(label: 'Service', value: request.category.label),
+                ReceiptRow(label: 'Type', value: request.issue),
+                ReceiptRow(label: 'Location', value: request.propertyLabel),
+                ReceiptRow(
+                  label: 'Preferred time',
+                  value:
+                      '${Fmt.relativeDay(request.preferredDate)}, '
+                      '${request.timeSlot}',
                 ),
-                Gaps.lg,
-                Text('Request received', style: theme.textTheme.headlineMedium),
-                Gaps.sm,
-                Text(
-                  'Reference ${request.reference} — track it any time in '
-                  'Activity.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.inkMuted,
-                  ),
-                ),
-                Gaps.xxl,
-                AppCard(
-                  padding: const EdgeInsets.all(Insets.xl),
-                  child: Column(
-                    children: [
-                      ReceiptRow(
-                        label: 'Service',
-                        value: request.category.label,
-                      ),
-                      ReceiptRow(label: 'Issue', value: request.issue),
-                      ReceiptRow(
-                        label: 'Location',
-                        value: request.propertyLabel,
-                      ),
-                      ReceiptRow(
-                        label: 'Preferred time',
-                        value:
-                            '${Fmt.relativeDay(request.preferredDate)}, ${request.timeSlot}',
-                      ),
-                      ReceiptRow(
-                        label: 'Call-out fee',
-                        value: request.calloutFee > 0
-                            ? Fmt.cedis(request.calloutFee)
-                            : 'Quoted after details',
-                      ),
-                    ],
-                  ),
-                ),
-                Gaps.lg,
-                const InfoBanner(
-                  icon: Icons.schedule_rounded,
-                  message:
-                      'What happens next: we assign a vetted professional, '
-                      'you get their profile and ETA, and you approve the '
-                      'quote before work starts.',
-                ),
-                Gaps.xxl,
-                FilledButton(
-                  onPressed: () {
-                    context.go(Routes.home);
-                    context.push(Routes.serviceRequest(request.id));
-                  },
-                  child: const Text('View request'),
-                ),
-                Gaps.md,
-                OutlinedButton(
-                  onPressed: () => context.go(Routes.home),
-                  child: const Text('Back to home'),
+                ReceiptRow(
+                  label: 'Price',
+                  value: 'From ${Fmt.cedis(request.estimate)}',
                 ),
               ],
             ),
           ),
-        ),
+          Gaps.lg,
+          const InfoBanner(
+            icon: Icons.schedule_rounded,
+            message:
+                'What happens next: we match you with a vetted '
+                'professional nearby and send you their name and arrival '
+                'time.',
+          ),
+        ],
+        actions: [
+          Gaps.xxl,
+          PrimaryButton(
+            label: 'View request',
+            onPressed: () {
+              context.go(Routes.home);
+              context.push(Routes.serviceRequest(request.id));
+            },
+          ),
+          Gaps.md,
+          SecondaryButton(
+            label: 'Back to home',
+            onPressed: () => context.go(Routes.home),
+          ),
+        ],
       ),
     );
   }

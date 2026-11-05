@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/service_art.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/widgets.dart';
 
@@ -20,7 +23,10 @@ class RequestDetailsScreen extends ConsumerWidget {
 
     if (request == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Service request')),
+        appBar: AppHeader(
+          title: 'Service request',
+          onBack: () => Navigator.of(context).maybePop(),
+        ),
         body: const ErrorView(
           title: 'Request not found',
           message: 'This service request may have been removed.',
@@ -29,41 +35,56 @@ class RequestDetailsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(request.category.label),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: Insets.lg),
-            child: Center(child: DemoTag()),
-          ),
-        ],
+      appBar: AppHeader(
+        title: request.reference,
+        onBack: () => context.pop(),
+        trailing: const DemoTag(),
       ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
-          // Status header
-          AppCard(
-            padding: const EdgeInsets.all(Insets.lg),
-            child: Row(
+          TintCard(
+            tint: request.category.tint,
+            arc: request.category.arc,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TintedIcon(request.category.icon, size: 48),
-                Gaps.md,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(request.issue, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${request.reference} • ${Fmt.relativeDay(request.createdAt)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.inkMuted,
-                        ),
+                Row(
+                  children: [
+                    ServiceBadge(category: request.category, size: 48),
+                    Gaps.md,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            request.category.label.toUpperCase(),
+                            style: AppText.overline.copyWith(
+                              color: request.category.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(request.issue, style: AppText.title),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                StatusBadge.request(request.status),
+                Gaps.lg,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${Fmt.relativeDay(request.preferredDate)} · '
+                        '${request.timeSlot}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.subtitle,
+                      ),
+                    ),
+                    StatusBadge.request(request.status),
+                  ],
+                ),
               ],
             ),
           ),
@@ -81,28 +102,26 @@ class RequestDetailsScreen extends ConsumerWidget {
             _ProviderCard(provider: request.provider!),
           ],
           Gaps.xl,
-          Text('Job status', style: theme.textTheme.headlineSmall),
+          Text('Progress', style: AppText.heading),
           Gaps.md,
           AppCard(
             padding: const EdgeInsets.all(Insets.xl),
             child: _Timeline(request: request),
           ),
           Gaps.xl,
-          Text('Cost summary', style: theme.textTheme.headlineSmall),
+          Text('Price', style: AppText.heading),
           Gaps.md,
           AppCard(
             padding: const EdgeInsets.all(Insets.xl),
             child: Column(
               children: [
                 ReceiptRow(
-                  label: 'Call-out fee',
-                  value: request.calloutFee > 0
-                      ? Fmt.cedis(request.calloutFee)
-                      : 'Quoted after details',
+                  label: 'Starting price',
+                  value: 'From ${Fmt.cedis(request.estimate)}',
                 ),
                 if (request.estimateLow != null)
                   ReceiptRow(
-                    label: 'Estimated labour',
+                    label: 'Quoted by your pro',
                     value:
                         '${Fmt.cedis(request.estimateLow!)} – ${Fmt.cedis(request.estimateHigh!)}',
                   ),
@@ -116,10 +135,9 @@ class RequestDetailsScreen extends ConsumerWidget {
                 ] else ...[
                   Gaps.sm,
                   Text(
-                    'The final cost is confirmed with you after diagnosis — '
-                    'no surprises.',
+                    'You pay once the job is done — never before.',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.inkFaint,
+                      color: AppColors.faint,
                     ),
                   ),
                 ],
@@ -127,13 +145,14 @@ class RequestDetailsScreen extends ConsumerWidget {
             ),
           ),
           Gaps.xl,
-          Text('Job details', style: theme.textTheme.headlineSmall),
+          Text('Details', style: AppText.heading),
           Gaps.md,
           AppCard(
             padding: const EdgeInsets.all(Insets.xl),
             child: Column(
               children: [
-                ReceiptRow(label: 'Problem', value: request.description),
+                if (request.description.isNotEmpty)
+                  ReceiptRow(label: 'Notes', value: request.description),
                 ReceiptRow(label: 'Location', value: request.propertyLabel),
                 ReceiptRow(
                   label: 'Requested time',
@@ -169,21 +188,21 @@ class RequestDetailsScreen extends ConsumerWidget {
             ),
           ),
           Gaps.xxl,
-          OutlinedButton.icon(
+          SecondaryButton(
+            label: 'Contact support',
             onPressed: () => _contactSupport(context),
-            icon: const Icon(Icons.support_agent_rounded, size: 20),
-            label: const Text('Contact support'),
+            icon: Icons.support_agent_rounded,
           ),
           if (request.status.isOpen) ...[
             Gaps.md,
-            OutlinedButton.icon(
+            SecondaryButton(
+              label: 'Reschedule',
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Rescheduling arrives with the live release'),
                 ),
               ),
-              icon: const Icon(Icons.event_repeat_rounded, size: 20),
-              label: const Text('Reschedule'),
+              icon: Icons.event_repeat_rounded,
             ),
             Gaps.md,
             TextButton(
@@ -279,11 +298,11 @@ class _ProviderCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 26,
-            backgroundColor: AppColors.mint,
+            backgroundColor: AppColors.navySoft,
             child: Text(
               provider.initials,
               style: theme.textTheme.titleMedium?.copyWith(
-                color: AppColors.forestDeep,
+                color: AppColors.navy,
               ),
             ),
           ),
@@ -296,7 +315,7 @@ class _ProviderCard extends StatelessWidget {
                 Text(
                   '${provider.role} • ${provider.yearsExperience}+ years',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.inkMuted,
+                    color: AppColors.muted,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -311,7 +330,7 @@ class _ProviderCard extends StatelessWidget {
                     Text(
                       '${provider.rating} (${provider.reviews} reviews)',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.inkMuted,
+                        color: AppColors.muted,
                       ),
                     ),
                   ],
@@ -326,8 +345,8 @@ class _ProviderCard extends StatelessWidget {
               ),
             ),
             style: IconButton.styleFrom(
-              backgroundColor: AppColors.tealSoft,
-              foregroundColor: AppColors.teal,
+              backgroundColor: AppColors.navySoft,
+              foregroundColor: AppColors.navy,
             ),
             tooltip: 'Call ${provider.name}',
             icon: const Icon(Icons.call_rounded, size: 20),
@@ -360,8 +379,8 @@ class _Timeline extends StatelessWidget {
                 ? AppColors.danger
                 : AppColors.success,
             iconBg: cancelled && i == events.length - 1
-                ? AppColors.dangerSoft
-                : AppColors.successSoft,
+                ? AppColors.dangerBg
+                : AppColors.successBg,
             title: events[i].title,
             subtitle: events[i].subtitle,
             time: Fmt.dateTime(events[i].time),
@@ -371,8 +390,8 @@ class _Timeline extends StatelessWidget {
         for (var i = 0; i < upcoming.length; i++)
           _TimelineRow(
             icon: Icons.circle_outlined,
-            iconColor: AppColors.inkFaint,
-            iconBg: AppColors.surfaceDim,
+            iconColor: AppColors.faint,
+            iconBg: AppColors.surfaceSubtle,
             title: upcoming[i],
             subtitle: null,
             time: null,
@@ -383,16 +402,26 @@ class _Timeline extends StatelessWidget {
     );
   }
 
-  List<String> _upcomingSteps() => switch (request.status) {
-    ServiceRequestStatus.pending => [
-      'Technician assigned',
-      'Work starts',
-      'Job completed',
-    ],
-    ServiceRequestStatus.assigned => ['Work starts', 'Job completed'],
-    ServiceRequestStatus.inProgress => ['Job completed'],
-    _ => const [],
-  };
+  List<String> _upcomingSteps() {
+    final (assigned, started, done) = switch (request.category) {
+      ServiceCategory.cleaning => (
+        'Cleaner assigned',
+        'Cleaning starts',
+        'Job completed',
+      ),
+      ServiceCategory.laundry => (
+        'Laundry assigned',
+        'Items picked up',
+        'Items delivered',
+      ),
+    };
+    return switch (request.status) {
+      ServiceRequestStatus.pending => [assigned, started, done],
+      ServiceRequestStatus.assigned => [started, done],
+      ServiceRequestStatus.inProgress => [done],
+      _ => const [],
+    };
+  }
 }
 
 class _TimelineRow extends StatelessWidget {
@@ -439,7 +468,7 @@ class _TimelineRow extends StatelessWidget {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.symmetric(vertical: 2),
-                    color: AppColors.divider,
+                    color: AppColors.line,
                   ),
                 ),
             ],
@@ -454,7 +483,7 @@ class _TimelineRow extends StatelessWidget {
                   Text(
                     title,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: active ? AppColors.ink : AppColors.inkFaint,
+                      color: active ? AppColors.ink : AppColors.faint,
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -462,7 +491,7 @@ class _TimelineRow extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.inkMuted,
+                        color: AppColors.muted,
                       ),
                     ),
                   ],
@@ -471,7 +500,7 @@ class _TimelineRow extends StatelessWidget {
                     Text(
                       time!,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.inkFaint,
+                        color: AppColors.faint,
                       ),
                     ),
                   ],
@@ -504,17 +533,13 @@ class _PhotoStrip extends StatelessWidget {
       children: [
         Text(
           label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: AppColors.inkFaint,
-          ),
+          style: theme.textTheme.labelMedium?.copyWith(color: AppColors.faint),
         ),
         Gaps.sm,
         if (count == 0)
           Text(
             emptyHint,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.inkFaint,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.faint),
           )
         else
           Row(
@@ -524,10 +549,10 @@ class _PhotoStrip extends StatelessWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: AppColors.tealSoft,
+                    color: AppColors.navySoft,
                     borderRadius: Corners.mdRadius,
                   ),
-                  child: const Icon(Icons.image_rounded, color: AppColors.teal),
+                  child: const Icon(Icons.image_rounded, color: AppColors.navy),
                 ),
                 Gaps.sm,
               ],

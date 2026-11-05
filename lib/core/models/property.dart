@@ -9,6 +9,7 @@ class Property {
     required this.address,
     this.kind = PropertyKind.house,
     this.isPrimary = false,
+    this.ghanaPostGps,
   });
 
   final String id;
@@ -18,6 +19,10 @@ class Property {
   final String address;
   final PropertyKind kind;
   final bool isPrimary;
+
+  /// Digital address such as `GA-123-4567`. Not edited in the app yet, but
+  /// carried through so a full-replace update never clears it.
+  final String? ghanaPostGps;
 
   /// e.g. "East Legon, Accra"
   String get location => '$area, $city';
@@ -37,5 +42,6 @@ class Property {
     address: address ?? this.address,
     kind: kind ?? this.kind,
     isPrimary: isPrimary ?? this.isPrimary,
+    ghanaPostGps: ghanaPostGps,
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/data/api/api_exception.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
@@ -25,7 +26,10 @@ class PropertyDetailsScreen extends ConsumerWidget {
 
     if (property == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Home')),
+        appBar: AppHeader(
+          title: 'Home',
+          onBack: () => Navigator.of(context).maybePop(),
+        ),
         body: const ErrorView(
           title: 'Home not found',
           message: 'This home may have been removed.',
@@ -48,26 +52,19 @@ class PropertyDetailsScreen extends ConsumerWidget {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(property.nickname),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit home',
-            onPressed: () => context.push(Routes.editProperty(property.id)),
-          ),
-        ],
+      appBar: AppHeader(
+        title: property.nickname,
+        onBack: () => context.pop(),
+        trailing: NavChip(
+          icon: Icons.edit_outlined,
+          tooltip: 'Edit home',
+          onPressed: () => context.push(Routes.editProperty(property.id)),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
-          Container(
-            padding: const EdgeInsets.all(Insets.xl),
-            decoration: BoxDecoration(
-              color: AppColors.forestDeep,
-              borderRadius: Corners.xlRadius,
-              boxShadow: AppColors.floatingShadow,
-            ),
+          NavyPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -77,7 +74,7 @@ class PropertyDetailsScreen extends ConsumerWidget {
                       property.kind == PropertyKind.apartment
                           ? Icons.apartment_rounded
                           : Icons.home_rounded,
-                      color: AppColors.mint,
+                      color: AppColors.navySoft,
                     ),
                     Gaps.sm,
                     Expanded(
@@ -99,30 +96,33 @@ class PropertyDetailsScreen extends ConsumerWidget {
                 Text(
                   '${property.address}\n${property.location}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.onForestMuted,
+                    color: AppColors.onNavyMuted,
                   ),
                 ),
                 if (!property.isPrimary) ...[
                   Gaps.lg,
-                  OutlinedButton(
-                    onPressed: () {
-                      ref
-                          .read(propertiesProvider.notifier)
-                          .setPrimary(property.id);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${property.nickname} is now your primary home',
+                  SecondaryButton(
+                    label: 'Make primary home',
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await ref
+                            .read(propertiesProvider.notifier)
+                            .setPrimary(property.id);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${property.nickname} is now your primary home',
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      } on Object catch (error) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(errorMessage(error))),
+                        );
+                      }
                     },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.mint,
-                      side: const BorderSide(color: AppColors.forestSoft),
-                      minimumSize: const Size(0, 44),
-                    ),
-                    child: const Text('Make primary home'),
+                    expand: false,
                   ),
                 ],
               ],
@@ -150,7 +150,7 @@ class PropertyDetailsScreen extends ConsumerWidget {
                 onTap: () => showAccountFormSheet(context, existing: account),
                 child: Row(
                   children: [
-                    TintedIcon(account.type.icon),
+                    BillerMark(account.type),
                     Gaps.md,
                     Expanded(
                       child: Column(
@@ -164,7 +164,7 @@ class PropertyDetailsScreen extends ConsumerWidget {
                           Text(
                             '${account.type.label} • ${Fmt.masked(account.accountNumber)}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.inkMuted,
+                              color: AppColors.muted,
                             ),
                           ),
                         ],

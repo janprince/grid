@@ -6,6 +6,10 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/models/models.dart';
+import '../../core/theme/service_art.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/widgets.dart';
 
 class _OnboardPage {
   const _OnboardPage(this.icon, this.title, this.message);
@@ -23,10 +27,10 @@ const _pages = [
         'seconds — all from one place.',
   ),
   _OnboardPage(
-    Icons.handyman_rounded,
-    'Book trusted help',
-    'Vetted plumbers, electricians and AC technicians for your home, '
-        'with transparent call-out fees.',
+    Icons.cleaning_services_rounded,
+    'Book cleaning and laundry',
+    'Vetted cleaners and laundries near you. You pay once the job is '
+        'done.',
   ),
   _OnboardPage(
     Icons.other_houses_rounded,
@@ -102,30 +106,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 160,
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: AppColors.tealSoft,
-                            borderRadius: BorderRadius.circular(48),
-                          ),
-                          child: Icon(
-                            page.icon,
-                            size: 64,
-                            color: AppColors.forest,
-                          ),
-                        ),
+                        SizedBox(height: 200, child: _PageArt(index: i)),
                         Gaps.xxxl,
                         Text(
                           page.title,
-                          style: theme.textTheme.headlineLarge,
+                          style: AppText.headline,
                           textAlign: TextAlign.center,
                         ),
                         Gaps.lg,
                         Text(
                           page.message,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            color: AppColors.inkMuted,
+                            color: AppColors.muted,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -145,9 +137,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   width: i == _page ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: i == _page
-                        ? AppColors.forestDeep
-                        : AppColors.outline,
+                    color: i == _page ? AppColors.navy : AppColors.line,
                     borderRadius: Corners.pill,
                   ),
                 ),
@@ -155,9 +145,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             Padding(
               padding: const EdgeInsets.all(Insets.xl),
-              child: FilledButton(
+              child: PrimaryButton(
+                label: isLast ? 'Get started' : 'Next',
                 onPressed: _next,
-                child: Text(isLast ? 'Get started' : 'Next'),
               ),
             ),
           ],
@@ -165,4 +155,75 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
     );
   }
+}
+
+/// A small piece of the real product for each page, instead of an icon.
+class _PageArt extends StatelessWidget {
+  const _PageArt({required this.index});
+  final int index;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 300),
+        child: switch (index) {
+          0 => NavyPanel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'POWER LEFT',
+                  style: AppText.overline.copyWith(
+                    color: AppColors.onNavyMuted,
+                  ),
+                ),
+                Gaps.sm,
+                Text(
+                  '71 units',
+                  style: AppText.amountXL.copyWith(color: Colors.white),
+                ),
+                Gaps.lg,
+                const MeterBar(fraction: 0.62, caption: 'About 11 days left'),
+              ],
+            ),
+          ),
+          1 => Row(
+            children: [
+              for (final category in ServiceCategory.values) ...[
+                Expanded(
+                  child: TintCard(
+                    tint: category.tint,
+                    arc: category.arc,
+                    padding: const EdgeInsets.all(Insets.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ServiceBadge(category: category, size: 40),
+                        Gaps.xl,
+                        Text(
+                          category.label,
+                          maxLines: 2,
+                          style: AppText.subtitle,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (category != ServiceCategory.values.last) Gaps.md,
+              ],
+            ],
+          ),
+          _ => const DetailGroup(
+            rows: [
+              DetailRow(label: 'My Home', value: 'ECG · Water · DStv'),
+              DetailRow(label: "Mum's House", value: 'ECG · Water'),
+              DetailRow(label: 'Tenant Apartment', value: 'ECG'),
+            ],
+          ),
+        },
+      ),
+    ),
+  );
 }

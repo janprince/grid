@@ -10,9 +10,10 @@ enum UtilityType {
     tagline: 'Prepaid electricity top-up',
     icon: Icons.bolt_rounded,
     accountLabel: 'Meter number',
-    accountHint: 'e.g. 14258901334',
-    minDigits: 10,
-    maxDigits: 13,
+    accountHint: 'e.g. P191177631',
+    minDigits: 9,
+    maxDigits: 20,
+    allowsLetters: true,
     quickAmounts: [50, 100, 200, 500],
   ),
   water(
@@ -37,7 +38,7 @@ enum UtilityType {
     accountHint: 'e.g. 7024561890',
     minDigits: 10,
     maxDigits: 11,
-    isPlanBased: true,
+    quickAmounts: [100, 200, 400, 800],
   ),
   gotv(
     label: 'GOtv',
@@ -49,7 +50,7 @@ enum UtilityType {
     accountHint: 'e.g. 2019845672',
     minDigits: 10,
     maxDigits: 11,
-    isPlanBased: true,
+    quickAmounts: [50, 100, 200, 300],
   ),
   startimes(
     label: 'StarTimes',
@@ -61,7 +62,7 @@ enum UtilityType {
     accountHint: 'e.g. 02501234567',
     minDigits: 10,
     maxDigits: 12,
-    isPlanBased: true,
+    quickAmounts: [50, 100, 150, 250],
   ),
   airtime(
     label: 'Airtime',
@@ -90,16 +91,16 @@ enum UtilityType {
     isPlanBased: true,
   ),
   internet(
-    label: 'Internet / Fibre',
+    label: 'Telecel Broadband',
     shortLabel: 'Internet',
-    providerName: 'Surfline • MTN Fibre • Telecel Broadband',
-    tagline: 'Broadband renewal',
+    providerName: 'Telecel Ghana',
+    tagline: 'Broadband top-up',
     icon: Icons.wifi_rounded,
-    accountLabel: 'Account ID',
-    accountHint: 'e.g. 88012345',
+    accountLabel: 'Landline number',
+    accountHint: 'e.g. 0302450262',
     minDigits: 6,
     maxDigits: 12,
-    isPlanBased: true,
+    quickAmounts: [50, 100, 200, 300],
   );
 
   const UtilityType({
@@ -114,6 +115,7 @@ enum UtilityType {
     required this.maxDigits,
     this.isPlanBased = false,
     this.isPhoneAccount = false,
+    this.allowsLetters = false,
     this.quickAmounts = const [],
   });
 
@@ -127,12 +129,14 @@ enum UtilityType {
   final int minDigits;
   final int maxDigits;
 
-  /// Plan-based utilities (TV, data, internet) pick a package;
-  /// the rest enter an amount.
+  /// Data bundles pick a package the telco offers; everything else enters an amount.
   final bool isPlanBased;
 
   /// Airtime/data are keyed to a phone number, not a meter/account.
   final bool isPhoneAccount;
+
+  /// ECG meter numbers can start with a letter (e.g. P191177631).
+  final bool allowsLetters;
   final List<int> quickAmounts;
 
   bool get isTv =>

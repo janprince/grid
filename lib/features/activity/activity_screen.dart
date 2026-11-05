@@ -7,6 +7,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/widgets/widgets.dart';
 import '../payments/widgets/transaction_receipt_sheet.dart';
 import 'widgets/activity_tile.dart';
@@ -26,7 +27,6 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final all = ref.watch(activityProvider);
     final properties = ref.watch(propertiesProvider);
 
@@ -46,100 +46,71 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     }).toList();
 
     return Scaffold(
+      appBar: const AppHeader(title: 'Activity'),
       body: SafeArea(
+        top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Insets.xl,
-                Insets.lg,
-                Insets.xl,
-                0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Gaps.lg,
+            // One chip everywhere, replacing the stock SegmentedButton and
+            // the hand-rolled property pills it sat above.
+            SizedBox(
+              height: 40,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
                 children: [
-                  Text('Activity', style: theme.textTheme.headlineLarge),
-                  Gaps.xs,
-                  Text(
-                    'Every payment and service request, in one history.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.inkMuted,
+                  for (final (filter, label) in const [
+                    (_Filter.all, 'All'),
+                    (_Filter.payments, 'Payments'),
+                    (_Filter.services, 'Services'),
+                  ]) ...[
+                    GridChip(
+                      label: label,
+                      selected: _filter == filter,
+                      onTap: () => setState(() => _filter = filter),
                     ),
-                  ),
-                  Gaps.lg,
-                  SegmentedButton<_Filter>(
-                    segments: const [
-                      ButtonSegment(value: _Filter.all, label: Text('All')),
-                      ButtonSegment(
-                        value: _Filter.payments,
-                        label: Text('Payments'),
-                      ),
-                      ButtonSegment(
-                        value: _Filter.services,
-                        label: Text('Services'),
-                      ),
-                    ],
-                    selected: {_filter},
-                    onSelectionChanged: (selection) =>
-                        setState(() => _filter = selection.first),
-                    showSelectedIcon: false,
-                    style: SegmentedButton.styleFrom(
-                      selectedBackgroundColor: AppColors.mint,
-                      selectedForegroundColor: AppColors.forestDeep,
-                    ),
-                  ),
-                  Gaps.md,
-                  SizedBox(
-                    height: 36,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _PropertyFilterChip(
-                          label: 'All homes',
-                          selected: _propertyFilter == null,
-                          onTap: () => setState(() => _propertyFilter = null),
-                        ),
-                        Gaps.sm,
-                        for (final property in properties) ...[
-                          _PropertyFilterChip(
-                            label: property.nickname,
-                            selected: _propertyFilter == property.id,
-                            onTap: () =>
-                                setState(() => _propertyFilter = property.id),
-                          ),
-                          Gaps.sm,
-                        ],
-                      ],
-                    ),
-                  ),
+                    Gaps.sm,
+                  ],
                 ],
               ),
             ),
+            if (properties.length > 1) ...[
+              Gaps.sm,
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
+                  children: [
+                    GridChip(
+                      label: 'All homes',
+                      icon: Icons.home_rounded,
+                      accent: AppColors.navy,
+                      selected: _propertyFilter == null,
+                      onTap: () => setState(() => _propertyFilter = null),
+                    ),
+                    Gaps.sm,
+                    for (final property in properties) ...[
+                      GridChip(
+                        label: property.nickname,
+                        accent: AppColors.navy,
+                        selected: _propertyFilter == property.id,
+                        onTap: () =>
+                            setState(() => _propertyFilter = property.id),
+                      ),
+                      Gaps.sm,
+                    ],
+                  ],
+                ),
+              ),
+            ],
+            Gaps.md,
             Expanded(
               child: items.isEmpty
                   ? _emptyState(context)
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(Insets.xl),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => Gaps.md,
-                      itemBuilder: (context, i) {
-                        final item = items[i];
-                        return ActivityTile(
-                          item: item,
-                          onTap: () {
-                            if (item.transaction != null) {
-                              showTransactionSheet(context, item.transaction!);
-                            } else if (item.request != null) {
-                              context.push(
-                                Routes.serviceRequest(item.request!.id),
-                              );
-                            }
-                          },
-                        );
-                      },
-                    ),
+                  : _GroupedActivityList(items: items),
             ),
           ],
         ),
@@ -159,12 +130,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         onAction: () => context.go(Routes.pay),
       ),
       _Filter.services => EmptyState(
-        icon: Icons.handyman_rounded,
+        icon: Icons.cleaning_services_rounded,
         title: 'No service requests',
         message:
-            'Book trusted help for your home and track every job '
+            'Book a clean or a laundry pickup and track every job '
             'here.',
-        actionLabel: 'Request a service',
+        actionLabel: 'Book a service',
         onAction: () => context.push(Routes.bookService),
       ),
       _Filter.all => EmptyState(
@@ -180,44 +151,63 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   }
 }
 
-class _PropertyFilterChip extends StatelessWidget {
-  const _PropertyFilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+/// History under date headers, the way every reference banking app does it —
+/// the header carries the "when", so each row no longer has to repeat it.
+class _GroupedActivityList extends StatelessWidget {
+  const _GroupedActivityList({required this.items});
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final List<ActivityItem> items;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.forestDeep : AppColors.card,
-      borderRadius: Corners.pill,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Insets.lg,
-            vertical: Insets.sm,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: Corners.pill,
-            border: Border.all(
-              color: selected ? AppColors.forestDeep : AppColors.outline,
+    final theme = Theme.of(context);
+
+    // Flatten to headers and rows so the whole history stays one lazily
+    // built list rather than a column of nested lists.
+    final entries = <(String?, ActivityItem?)>[];
+    String? lastGroup;
+    for (final item in items) {
+      final group = Fmt.relativeDay(item.date);
+      if (group != lastGroup) {
+        entries.add((group, null));
+        lastGroup = group;
+      }
+      entries.add((null, item));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(Insets.md, 0, Insets.md, Insets.xxxl),
+      itemCount: entries.length,
+      itemBuilder: (context, i) {
+        final (header, item) = entries[i];
+        if (header != null) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              Insets.sm,
+              i == 0 ? Insets.sm : Insets.xl,
+              Insets.sm,
+              Insets.sm,
             ),
-          ),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: selected ? Colors.white : AppColors.ink,
+            child: Text(
+              header,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.faint,
+                letterSpacing: 1.0,
+              ),
             ),
-          ),
-        ),
-      ),
+          );
+        }
+        return ActivityTile(
+          item: item!,
+          onTap: () {
+            if (item.transaction != null) {
+              showTransactionSheet(context, item.transaction!);
+            } else if (item.request != null) {
+              context.push(Routes.serviceRequest(item.request!.id));
+            }
+          },
+        );
+      },
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Section title with an optional trailing action ("See all").
 class SectionHeader extends StatelessWidget {
@@ -11,7 +12,7 @@ class SectionHeader extends StatelessWidget {
     this.onAction,
     this.padding = const EdgeInsets.fromLTRB(
       Insets.xl,
-      Insets.xxxl,
+      28,
       Insets.xl,
       Insets.md,
     ),
@@ -28,12 +29,7 @@ class SectionHeader extends StatelessWidget {
       padding: padding,
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-          ),
+          Expanded(child: Text(title, style: AppText.heading)),
           if (actionLabel != null)
             TextButton(
               onPressed: onAction,

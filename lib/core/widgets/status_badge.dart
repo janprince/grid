@@ -6,8 +6,8 @@ import '../theme/app_spacing.dart';
 
 enum BadgeTone { success, warning, danger, info, neutral }
 
-/// Pill badge with a soft tinted background — the app's single way of
-/// showing a status.
+/// Outlined status pill: light fill, coloured edge, coloured text — the
+/// app's single way of showing a status.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.label, required this.tone});
 
@@ -37,27 +37,59 @@ class StatusBadge extends StatelessWidget {
   final BadgeTone tone;
 
   @override
-  Widget build(BuildContext context) {
-    final (bg, fg) = switch (tone) {
-      BadgeTone.success => (AppColors.successSoft, AppColors.success),
-      BadgeTone.warning => (AppColors.warningSoft, AppColors.warning),
-      BadgeTone.danger => (AppColors.dangerSoft, AppColors.danger),
-      BadgeTone.info => (AppColors.infoSoft, AppColors.info),
-      BadgeTone.neutral => (AppColors.surfaceDim, AppColors.inkMuted),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Insets.md,
-        vertical: Insets.xs,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: tone.background,
+      borderRadius: Corners.pill,
+      border: Border.all(color: tone.border),
+    ),
+    child: Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: tone.foreground,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
       ),
-      decoration: BoxDecoration(color: bg, borderRadius: Corners.pill),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: fg,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
+
+/// Colours and icon for each tone. Shared by [StatusBadge] and
+/// `StatusBanner`, so a status reads the same wherever it appears.
+extension BadgeToneStyle on BadgeTone {
+  Color get background => switch (this) {
+    BadgeTone.success => AppColors.successBg,
+    BadgeTone.warning => AppColors.warningBg,
+    BadgeTone.danger => AppColors.dangerBg,
+    BadgeTone.info => AppColors.navySoft,
+    BadgeTone.neutral => AppColors.chip,
+  };
+
+  Color get foreground => switch (this) {
+    BadgeTone.success => AppColors.success,
+    BadgeTone.warning => AppColors.warningText,
+    BadgeTone.danger => AppColors.danger,
+    BadgeTone.info => AppColors.navy,
+    BadgeTone.neutral => AppColors.muted,
+  };
+
+  Color get border => switch (this) {
+    BadgeTone.success => AppColors.successLine,
+    BadgeTone.warning => AppColors.warningLine,
+    BadgeTone.danger => AppColors.dangerLine,
+    BadgeTone.info => const Color(0xFFB9C7DC),
+    BadgeTone.neutral => AppColors.lineStrong,
+  };
+
+  IconData get icon => switch (this) {
+    BadgeTone.success => Icons.check_circle_outline_rounded,
+    BadgeTone.warning => Icons.error_outline_rounded,
+    BadgeTone.danger => Icons.cancel_outlined,
+    BadgeTone.info => Icons.info_outline_rounded,
+    BadgeTone.neutral => Icons.info_outline_rounded,
+  };
 }

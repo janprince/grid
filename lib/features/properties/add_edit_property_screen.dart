@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/data/api/api_exception.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/validators.dart';
+import '../../core/widgets/widgets.dart';
 
 class AddEditPropertyScreen extends ConsumerStatefulWidget {
   const AddEditPropertyScreen({super.key, this.propertyId});
@@ -41,35 +43,54 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
     super.dispose();
   }
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  bool _saving = false;
+  Map<String, String> _fieldErrors = const {};
+  String? _error;
+
+  Future<void> _save() async {
+    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
     final notifier = ref.read(propertiesProvider.notifier);
     final existing = _existing;
+    setState(() {
+      _saving = true;
+      _fieldErrors = const {};
+      _error = null;
+    });
 
-    if (existing == null) {
-      final property = Property(
-        id: 'p${DateTime.now().microsecondsSinceEpoch}',
-        nickname: _nicknameCtrl.text.trim(),
-        area: _areaCtrl.text.trim(),
-        city: _cityCtrl.text.trim(),
-        address: _addressCtrl.text.trim(),
-        kind: _kind,
-        isPrimary: _isPrimary,
-      );
-      notifier.add(property);
-    } else {
-      notifier.update(
-        existing.copyWith(
-          nickname: _nicknameCtrl.text.trim(),
-          area: _areaCtrl.text.trim(),
-          city: _cityCtrl.text.trim(),
-          address: _addressCtrl.text.trim(),
-          kind: _kind,
-          isPrimary: _isPrimary,
-        ),
-      );
+    try {
+      if (existing == null) {
+        await notifier.add(
+          Property(
+            id: '',
+            nickname: _nicknameCtrl.text.trim(),
+            area: _areaCtrl.text.trim(),
+            city: _cityCtrl.text.trim(),
+            address: _addressCtrl.text.trim(),
+            kind: _kind,
+          ),
+          makePrimary: _isPrimary,
+        );
+      } else {
+        await notifier.save(
+          existing.copyWith(
+            nickname: _nicknameCtrl.text.trim(),
+            area: _areaCtrl.text.trim(),
+            city: _cityCtrl.text.trim(),
+            address: _addressCtrl.text.trim(),
+            kind: _kind,
+          ),
+          makePrimary: _isPrimary,
+        );
+      }
+      if (mounted) context.pop();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _fieldErrors = error is ApiException ? error.fieldErrors : const {};
+        _error = _fieldErrors.isEmpty ? errorMessage(error) : null;
+      });
     }
-    context.pop();
   }
 
   Future<void> _delete() async {
@@ -95,9 +116,20 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
         ],
       ),
     );
-    if ((confirmed ?? false) && mounted) {
-      ref.read(propertiesProvider.notifier).remove(existing.id);
-      context.go('/properties');
+    if (!(confirmed ?? false) || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(propertiesProvider.notifier).remove(existing.id);
+      if (mounted) context.go('/properties');
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = errorMessage(error);
+      });
     }
   }
 
@@ -106,7 +138,10 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
     final isEditing = _existing != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit home' : 'Add a home')),
+      appBar: AppHeader(
+        title: isEditing ? 'Edit home' : 'Add a home',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(Insets.xl),
@@ -138,15 +173,16 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
                       setState(() => _kind = selection.first),
                   showSelectedIcon: false,
                   style: SegmentedButton.styleFrom(
-                    selectedBackgroundColor: AppColors.mint,
-                    selectedForegroundColor: AppColors.forestDeep,
+                    selectedBackgroundColor: AppColors.navySoft,
+                    selectedForegroundColor: AppColors.navy,
                   ),
                 ),
                 Gaps.xl,
                 TextFormField(
                   controller: _nicknameCtrl,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    errorText: _fieldErrors['nickname'],
                     labelText: 'Nickname',
                     hintText: "e.g. My Home, Mum's House",
                   ),
@@ -156,7 +192,8 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
                 TextFormField(
                   controller: _addressCtrl,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    errorText: _fieldErrors['address'],
                     labelText: 'Street address',
                     hintText: 'e.g. 45 Mensah Wood Ave',
                   ),
@@ -169,7 +206,8 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
                       child: TextFormField(
                         controller: _areaCtrl,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
+                          errorText: _fieldErrors['area'],
                           labelText: 'Area',
                           hintText: 'e.g. East Legon',
                         ),
@@ -181,7 +219,8 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
                       child: TextFormField(
                         controller: _cityCtrl,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
+                          errorText: _fieldErrors['city'],
                           labelText: 'City',
                           hintText: 'e.g. Accra',
                         ),
@@ -193,21 +232,29 @@ class _AddEditPropertyScreenState extends ConsumerState<AddEditPropertyScreen> {
                 Gaps.sm,
                 SwitchListTile(
                   value: _isPrimary,
-                  onChanged: (v) => setState(() => _isPrimary = v),
+                  // The primary home only changes by choosing another one.
+                  onChanged: (_existing?.isPrimary ?? false)
+                      ? null
+                      : (v) => setState(() => _isPrimary = v),
                   title: const Text('Primary home'),
                   subtitle: const Text('Selected by default across the app'),
                   contentPadding: EdgeInsets.zero,
-                  activeTrackColor: AppColors.forest,
+                  activeTrackColor: AppColors.navy,
                 ),
+                if (_error case final error?) ...[
+                  Gaps.lg,
+                  InfoBanner.warning(message: error),
+                ],
                 Gaps.xl,
-                FilledButton(
+                PrimaryButton(
+                  label: isEditing ? 'Save changes' : 'Add home',
+                  busy: _saving,
                   onPressed: _save,
-                  child: Text(isEditing ? 'Save changes' : 'Add home'),
                 ),
                 if (isEditing) ...[
                   Gaps.sm,
                   TextButton.icon(
-                    onPressed: _delete,
+                    onPressed: _saving ? null : _delete,
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.danger,
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_theme.dart';
 
 /// Label–value line inside receipts and review cards.
 class ReceiptRow extends StatelessWidget {
@@ -31,7 +32,7 @@ class ReceiptRow extends StatelessWidget {
             child: Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.inkMuted,
+                color: AppColors.muted,
               ),
             ),
           ),
@@ -43,8 +44,8 @@ class ReceiptRow extends StatelessWidget {
                   value,
                   textAlign: TextAlign.right,
                   style: emphasize
-                      ? theme.textTheme.titleMedium
-                      : theme.textTheme.bodyMedium?.copyWith(
+                      ? theme.textTheme.titleMedium?.tabular
+                      : theme.textTheme.bodyMedium?.tabular.copyWith(
                           fontWeight: FontWeight.w500,
                         ),
                 ),
@@ -70,11 +71,8 @@ class DashedDivider extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(
             count,
-            (_) => Container(
-              width: dashWidth,
-              height: 1.2,
-              color: AppColors.outline,
-            ),
+            (_) =>
+                Container(width: dashWidth, height: 1.2, color: AppColors.line),
           ),
         );
       },
