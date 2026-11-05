@@ -11,8 +11,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/widgets.dart';
 import 'otp_screen.dart';
-
-enum _LoginMode { phone, email }
+import '../../core/data/api/api_exception.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -24,51 +23,53 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  _LoginMode _mode = _LoginMode.phone;
   bool _sending = false;
+  String? _error;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _continue() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _sending = true);
+    if (_sending || !(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
 
-    final isEmail = _mode == _LoginMode.email;
-    final destination = isEmail
-        ? _emailController.text.trim()
-        : Validators.normalizePhone(_phoneController.text);
-    final display = isEmail ? destination : Fmt.ghanaPhone(destination);
-
-    await ref.read(authApiProvider).requestOtp(destination);
-
-    if (!mounted) return;
-    setState(() => _sending = false);
-    context.push(
-      Routes.otp,
-      extra: OtpArgs(
-        destination: destination,
-        display: display,
-        isEmail: isEmail,
-      ),
-    );
+    final phone = Validators.normalizePhone(_phoneController.text);
+    try {
+      final challenge = await ref.read(authApiProvider).requestOtp(phone);
+      if (!mounted) return;
+      setState(() => _sending = false);
+      context.push(Routes.otp, extra: OtpArgs(challenge: challenge));
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _error = switch (error.code) {
+          'auth.invalid_phone' => 'Enter a Ghana mobile number.',
+          'auth.otp_rate_limited' =>
+            'Too many codes requested. Try again in '
+                '${Fmt.waitTime(error.retryAfterSeconds)}.',
+          _ => error.message,
+        };
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isPhone = _mode == _LoginMode.phone;
+    final isDemo = !ref.watch(apiEnabledProvider);
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(Insets.xxl),
+            padding: const EdgeInsets.all(Insets.xl),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
@@ -76,101 +77,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Center(child: GridLogo(size: 72)),
-                    Gaps.lg,
-                    Center(
-                      child: Text(
-                        'Welcome to GRID',
-                        style: theme.textTheme.headlineLarge,
-                      ),
-                    ),
-                    Gaps.sm,
-                    Center(
-                      child: Text(
-                        'Manage everything your home needs.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.inkMuted,
-                        ),
-                      ),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: GridWordmark(fontSize: 20),
                     ),
                     Gaps.xxxl,
-                    SegmentedButton<_LoginMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: _LoginMode.phone,
-                          label: Text('Phone'),
-                          icon: Icon(Icons.smartphone_rounded, size: 18),
-                        ),
-                        ButtonSegment(
-                          value: _LoginMode.email,
-                          label: Text('Email'),
-                          icon: Icon(Icons.mail_outline_rounded, size: 18),
-                        ),
-                      ],
-                      selected: {_mode},
-                      onSelectionChanged: (selection) =>
-                          setState(() => _mode = selection.first),
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: AppColors.mint,
-                        selectedForegroundColor: AppColors.forestDeep,
-                      ),
+                    const ScreenIntro(
+                      title: 'Welcome to GRID',
+                      subtitle:
+                          'Pay bills and book cleaning or laundry — all in '
+                          'one place.',
                     ),
                     Gaps.xxl,
-                    if (isPhone)
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        autofillHints: const [AutofillHints.telephoneNumber],
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Phone number',
-                          hintText: '55 123 4567',
-                          prefixIcon: Padding(
-                            padding: EdgeInsets.only(
-                              left: Insets.lg,
-                              right: Insets.sm,
-                            ),
-                            child: Text('🇬🇭  +233'),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      autofillHints: const [AutofillHints.telephoneNumber],
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'Phone number',
+                        hintText: '55 123 4567',
+                        errorText: _error,
+                        errorMaxLines: 3,
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(
+                            left: Insets.lg,
+                            right: Insets.sm,
                           ),
-                          prefixIconConstraints: BoxConstraints(minWidth: 0),
+                          child: Text(
+                            '+233',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ink,
+                            ),
+                          ),
                         ),
-                        validator: Validators.ghanaPhone,
-                        onFieldSubmitted: (_) => _continue(),
-                      )
-                    else
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Email address',
-                          hintText: 'you@example.com',
-                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 0,
                         ),
-                        validator: Validators.email,
-                        onFieldSubmitted: (_) => _continue(),
                       ),
+                      validator: Validators.ghanaPhone,
+                      onFieldSubmitted: (_) => _continue(),
+                    ),
                     Gaps.xxl,
-                    FilledButton(
-                      onPressed: _sending ? null : _continue,
-                      child: _sending
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Continue'),
+                    PrimaryButton(
+                      label: 'Continue',
+                      busy: _sending,
+                      onPressed: _continue,
                     ),
                     Gaps.xl,
-                    const InfoBanner(
-                      message:
-                          'Demo sign-in — we will show you a one-time code '
-                          'on the next screen. No SMS is sent.',
+                    InfoBanner(
+                      message: isDemo
+                          ? 'Demo sign-in — we will show you a one-time code '
+                                'on the next screen. No SMS is sent.'
+                          : 'We will text a 6-digit code to this number. '
+                                'New to GRID? This creates your account.',
                     ),
                   ],
                 ),

@@ -1,3 +1,5 @@
+import '../models/utility_type.dart';
+
 /// Local form validation for Ghana-specific inputs.
 abstract final class Validators {
   /// Accepts `0XXXXXXXXX`, `XXXXXXXXX` or `+233XXXXXXXXX`.
@@ -47,6 +49,29 @@ abstract final class Validators {
       return min == max
           ? '$label must be $min digits'
           : '$label must be $min–$max digits';
+    }
+    return null;
+  }
+
+  /// The account number for [type]: a Ghana phone for airtime and data,
+  /// letters and digits for ECG meters, digits for everything else.
+  static String? account(String? value, UtilityType type) {
+    if (type.isPhoneAccount) return ghanaPhone(value);
+    if (!type.allowsLetters) {
+      return digits(
+        value,
+        min: type.minDigits,
+        max: type.maxDigits,
+        label: type.accountLabel,
+      );
+    }
+    final v = (value ?? '').replaceAll(RegExp(r'[\s-]'), '');
+    if (v.isEmpty) return '${type.accountLabel} is required';
+    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(v)) {
+      return '${type.accountLabel} can only contain letters and digits';
+    }
+    if (v.length < type.minDigits || v.length > type.maxDigits) {
+      return '${type.accountLabel} must be ${type.minDigits}–${type.maxDigits} characters';
     }
     return null;
   }

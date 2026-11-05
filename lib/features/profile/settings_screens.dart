@@ -17,7 +17,10 @@ class PaymentMethodsScreen extends ConsumerWidget {
     final methods = ref.watch(paymentMethodsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment methods')),
+      appBar: AppHeader(
+        title: 'Payment methods',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
@@ -39,7 +42,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                               ? 'Demo — always declines'
                               : method.maskedNumber,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkMuted,
+                            color: AppColors.muted,
                           ),
                         ),
                       ],
@@ -55,7 +58,8 @@ class PaymentMethodsScreen extends ConsumerWidget {
             Gaps.md,
           ],
           Gaps.sm,
-          OutlinedButton.icon(
+          SecondaryButton(
+            label: 'Add payment method',
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
@@ -63,8 +67,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            icon: const Icon(Icons.add_rounded, size: 20),
-            label: const Text('Add payment method'),
+            icon: Icons.add_rounded,
           ),
         ],
       ),
@@ -90,7 +93,10 @@ class _NotificationPrefsScreenState extends State<NotificationPrefsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppHeader(
+        title: 'Notifications',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
@@ -154,12 +160,10 @@ class _PrefSwitch extends StatelessWidget {
           title: Text(title, style: theme.textTheme.titleMedium),
           subtitle: Text(
             subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.inkMuted,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.muted),
           ),
           contentPadding: EdgeInsets.zero,
-          activeTrackColor: AppColors.forest,
+          activeTrackColor: AppColors.navy,
         ),
       ),
     );
@@ -203,7 +207,10 @@ class HelpCentreScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Help centre')),
+      appBar: AppHeader(
+        title: 'Help centre',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
@@ -224,21 +231,18 @@ class HelpCentreScreen extends StatelessWidget {
                       Text(
                         '030 700 0000 • 7am – 9pm, every day',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.inkMuted,
+                          color: AppColors.muted,
                         ),
                       ),
                     ],
                   ),
                 ),
-                FilledButton(
+                PrimaryButton(
+                  label: 'Call',
                   onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Calling is a demo action')),
                   ),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: Insets.lg),
-                  ),
-                  child: const Text('Call'),
+                  expand: false,
                 ),
               ],
             ),
@@ -269,7 +273,7 @@ class HelpCentreScreen extends StatelessWidget {
                       Text(
                         answer,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.inkMuted,
+                          color: AppColors.muted,
                         ),
                       ),
                     ],
@@ -298,7 +302,10 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Privacy & security')),
+      appBar: AppHeader(
+        title: 'Privacy & security',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
@@ -327,11 +334,11 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
               subtitle: Text(
                 'Require Face ID / fingerprint to open GRID',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.inkMuted,
+                  color: AppColors.muted,
                 ),
               ),
               contentPadding: EdgeInsets.zero,
-              activeTrackColor: AppColors.forest,
+              activeTrackColor: AppColors.navy,
             ),
           ),
           Gaps.md,
@@ -353,10 +360,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.inkFaint,
-                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
               ],
             ),
           ),

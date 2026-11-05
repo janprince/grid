@@ -1,16 +1,15 @@
 import 'service_category.dart';
 
 enum ServiceUrgency {
-  standard(label: 'Standard', description: 'Within 24–48 hours', surcharge: 0),
+  standard(
+    label: 'Scheduled',
+    description: 'On the day and time you pick',
+    surcharge: 0,
+  ),
   sameDay(
     label: 'Same day',
-    description: 'A professional visits today',
-    surcharge: 50,
-  ),
-  emergency(
-    label: 'Emergency',
-    description: 'ASAP — extra fee applies',
-    surcharge: 120,
+    description: 'Today, if a professional is free',
+    surcharge: 30,
   );
 
   const ServiceUrgency({
@@ -120,7 +119,8 @@ class ServiceRequest {
   final double? finalAmount;
   final List<TimelineEvent> timeline;
 
-  double get calloutFee => category.calloutFee + urgency.surcharge;
+  /// Starting price for this request, before the professional confirms.
+  double get estimate => category.fromPrice + urgency.surcharge;
 
   ServiceRequest copyWith({
     ServiceRequestStatus? status,

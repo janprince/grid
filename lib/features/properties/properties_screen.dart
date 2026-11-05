@@ -17,12 +17,15 @@ class PropertiesScreen extends ConsumerWidget {
     final properties = ref.watch(propertiesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My homes')),
+      appBar: AppHeader(
+        title: 'My homes',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       floatingActionButton: properties.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: () => context.push(Routes.addProperty),
-              backgroundColor: AppColors.forestDeep,
+              backgroundColor: AppColors.navy,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add_rounded),
               label: const Text('Add home'),
@@ -83,8 +86,8 @@ class _PropertyCard extends ConsumerWidget {
                     ? Icons.apartment_rounded
                     : Icons.home_rounded,
                 size: 48,
-                color: AppColors.forest,
-                background: AppColors.mint,
+                color: AppColors.navy,
+                background: AppColors.navySoft,
               ),
               Gaps.md,
               Expanded(
@@ -96,7 +99,7 @@ class _PropertyCard extends ConsumerWidget {
                     Text(
                       '${property.address}, ${property.city}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.inkMuted,
+                        color: AppColors.muted,
                       ),
                     ),
                   ],
@@ -119,7 +122,7 @@ class _PropertyCard extends ConsumerWidget {
                       vertical: Insets.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.tealSoft,
+                      color: AppColors.navySoft,
                       borderRadius: Corners.pill,
                     ),
                     child: Row(
@@ -128,13 +131,13 @@ class _PropertyCard extends ConsumerWidget {
                         Icon(
                           account.type.icon,
                           size: 13,
-                          color: AppColors.teal,
+                          color: AppColors.navy,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           account.type.shortLabel,
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: AppColors.teal,
+                            color: AppColors.navy,
                           ),
                         ),
                       ],

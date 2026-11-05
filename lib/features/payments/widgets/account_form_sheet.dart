@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/data/api/api_exception.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -49,36 +50,61 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
     super.dispose();
   }
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  bool _saving = false;
+  Map<String, String> _fieldErrors = const {};
+  String? _error;
+
+  Future<void> _save() async {
+    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
     final notifier = ref.read(accountsProvider.notifier);
     final number = _numberCtrl.text.replaceAll(RegExp(r'\s'), '');
     final nickname = _nicknameCtrl.text.trim();
+    setState(() {
+      _saving = true;
+      _fieldErrors = const {};
+      _error = null;
+    });
 
-    if (widget.existing == null) {
-      notifier.add(
-        UtilityAccount(
-          id: 'a${DateTime.now().microsecondsSinceEpoch}',
-          type: _type,
-          accountNumber: number,
-          nickname: nickname,
-          propertyId: _propertyId,
-          isDefault: _isDefault,
-        ),
-      );
-    } else {
-      notifier.update(
-        widget.existing!.copyWith(
-          type: _type,
-          accountNumber: number,
-          nickname: nickname,
-          propertyId: _propertyId,
-          clearProperty: _propertyId == null,
-          isDefault: _isDefault,
-        ),
-      );
+    try {
+      if (widget.existing == null) {
+        await notifier.add(
+          UtilityAccount(
+            id: '',
+            type: _type,
+            accountNumber: number,
+            nickname: nickname,
+            propertyId: _propertyId,
+            isDefault: _isDefault,
+          ),
+        );
+      } else {
+        await notifier.save(
+          widget.existing!.copyWith(
+            type: _type,
+            accountNumber: number,
+            nickname: nickname,
+            propertyId: _propertyId,
+            clearProperty: _propertyId == null,
+            isDefault: _isDefault,
+          ),
+        );
+      }
+      if (mounted) Navigator.of(context).pop();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _fieldErrors = switch (error) {
+          ApiException(code: 'utility_accounts.duplicate') => {
+            'accountNumber': error.message,
+          },
+          ApiException(:final fieldErrors) when fieldErrors.isNotEmpty =>
+            fieldErrors,
+          _ => const {},
+        };
+        if (_fieldErrors.isEmpty) _error = errorMessage(error);
+      });
     }
-    Navigator.of(context).pop();
   }
 
   Future<void> _delete() async {
@@ -103,9 +129,20 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
         ],
       ),
     );
-    if ((confirmed ?? false) && mounted) {
-      ref.read(accountsProvider.notifier).remove(widget.existing!.id);
-      Navigator.of(context).pop();
+    if (!(confirmed ?? false) || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(accountsProvider.notifier).remove(widget.existing!.id);
+      if (mounted) Navigator.of(context).pop();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = errorMessage(error);
+      });
     }
   }
 
@@ -130,7 +167,7 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
                     value: type,
                     child: Row(
                       children: [
-                        Icon(type.icon, size: 18, color: AppColors.teal),
+                        Icon(type.icon, size: 18, color: AppColors.navy),
                         Gaps.sm,
                         Text(type.label),
                       ],
@@ -144,30 +181,38 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
             Gaps.lg,
             TextFormField(
               controller: _numberCtrl,
-              keyboardType: TextInputType.number,
+              keyboardType: _type.allowsLetters
+                  ? TextInputType.text
+                  : TextInputType.number,
+              textCapitalization: TextCapitalization.characters,
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[\d\s]')),
+                FilteringTextInputFormatter.allow(
+                  _type.allowsLetters
+                      ? RegExp(r'[A-Za-z\d\s]')
+                      : RegExp(r'[\d\s]'),
+                ),
               ],
               decoration: InputDecoration(
                 labelText: _type.accountLabel,
                 hintText: _type.accountHint,
+                errorText: _fieldErrors['accountNumber'],
+                errorMaxLines: 2,
               ),
-              validator: (v) => _type.isPhoneAccount
-                  ? Validators.ghanaPhone(v)
-                  : Validators.digits(
-                      v,
-                      min: _type.minDigits,
-                      max: _type.maxDigits,
-                      label: _type.accountLabel,
-                    ),
+              onChanged: (_) {
+                if (_fieldErrors.isNotEmpty) {
+                  setState(() => _fieldErrors = const {});
+                }
+              },
+              validator: (v) => Validators.account(v, _type),
             ),
             Gaps.lg,
             TextFormField(
               controller: _nicknameCtrl,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Nickname',
                 hintText: "e.g. My Home, Mum's House",
+                errorText: _fieldErrors['nickname'],
               ),
               validator: (v) => Validators.notEmpty(v, label: 'Nickname'),
             ),
@@ -201,23 +246,26 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
               subtitle: Text(
                 'Preselected when you pay',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.inkFaint,
+                  color: AppColors.faint,
                 ),
               ),
               contentPadding: EdgeInsets.zero,
-              activeTrackColor: AppColors.forest,
+              activeTrackColor: AppColors.navy,
             ),
+            if (_error case final error?) ...[
+              Gaps.sm,
+              InfoBanner.warning(message: error),
+            ],
             Gaps.lg,
-            FilledButton(
+            PrimaryButton(
+              label: widget.existing == null ? 'Save account' : 'Save changes',
+              busy: _saving,
               onPressed: _save,
-              child: Text(
-                widget.existing == null ? 'Save account' : 'Save changes',
-              ),
             ),
             if (widget.existing != null) ...[
               Gaps.sm,
               TextButton.icon(
-                onPressed: _delete,
+                onPressed: _saving ? null : _delete,
                 style: TextButton.styleFrom(foregroundColor: AppColors.danger),
                 icon: const Icon(Icons.delete_outline_rounded, size: 18),
                 label: const Text('Delete account'),

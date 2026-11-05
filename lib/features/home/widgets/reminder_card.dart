@@ -24,12 +24,14 @@ class ReminderCard extends StatelessWidget {
       ),
       ReminderSeverity.warning => (
         TintedIcon.warning(reminder.icon),
-        AppColors.warning,
+        AppColors.warningText,
       ),
-      ReminderSeverity.info => (TintedIcon(reminder.icon), AppColors.inkMuted),
+      ReminderSeverity.info => (TintedIcon(reminder.icon), AppColors.muted),
     };
 
+    // The whole card is the action; the trailing label names it.
     return AppCard(
+      onTap: reminder.actionLabel == null ? null : () => _act(context),
       padding: const EdgeInsets.all(Insets.lg),
       child: Row(
         children: [
@@ -44,7 +46,7 @@ class ReminderCard extends StatelessWidget {
                 Text(
                   reminder.subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.inkMuted,
+                    color: AppColors.muted,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -57,14 +59,18 @@ class ReminderCard extends StatelessWidget {
           ),
           if (reminder.actionLabel != null) ...[
             Gaps.sm,
-            FilledButton(
-              onPressed: () => _act(context),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                padding: const EdgeInsets.symmetric(horizontal: Insets.lg),
-                textStyle: theme.textTheme.labelMedium,
+            Text(
+              reminder.actionLabel!,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
-              child: Text(reminder.actionLabel!),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.navy,
+              size: 20,
             ),
           ],
         ],

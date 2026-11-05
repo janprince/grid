@@ -9,17 +9,17 @@ class TintedIcon extends StatelessWidget {
     this.icon, {
     super.key,
     this.size = 44,
-    this.color = AppColors.teal,
-    this.background = AppColors.tealSoft,
+    this.color = AppColors.navy,
+    this.background = AppColors.navySoft,
   });
 
   const TintedIcon.danger(this.icon, {super.key, this.size = 44})
     : color = AppColors.danger,
-      background = AppColors.dangerSoft;
+      background = AppColors.dangerBg;
 
   const TintedIcon.warning(this.icon, {super.key, this.size = 44})
     : color = AppColors.warning,
-      background = AppColors.warningSoft;
+      background = AppColors.warningBg;
 
   final IconData icon;
   final double size;

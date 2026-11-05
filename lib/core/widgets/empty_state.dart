@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_theme.dart';
+import 'system.dart';
 
-/// Zero-data view: soft icon medallion, a short invitation to act,
+/// Zero-data view: soft icon tile, a short invitation to act,
 /// and one clear CTA.
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -36,38 +38,35 @@ class EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 84,
-              height: 84,
-              decoration: const BoxDecoration(
-                color: AppColors.tealSoft,
-                shape: BoxShape.circle,
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.navySoft,
+                borderRadius: BorderRadius.circular(22),
               ),
-              child: Icon(icon, size: 38, color: AppColors.teal),
+              child: Icon(icon, size: 32, color: AppColors.navy),
             ),
             Gaps.xl,
             Text(
               title,
-              style: theme.textTheme.headlineSmall,
+              style: AppText.heading.copyWith(fontSize: 18),
               textAlign: TextAlign.center,
             ),
             Gaps.sm,
             Text(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.inkMuted,
+                color: AppColors.muted,
               ),
               textAlign: TextAlign.center,
             ),
             if (actionLabel != null) ...[
               Gaps.xxl,
-              FilledButton.icon(
+              PrimaryButton(
+                label: actionLabel!,
+                icon: Icons.add_rounded,
+                expand: false,
                 onPressed: onAction,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: Insets.xxl),
-                ),
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: Text(actionLabel!),
               ),
             ],
           ],

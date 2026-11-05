@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import 'system.dart';
 
 /// A tappable card acting like a large radio option — used for saved
 /// accounts, payment methods, plans, urgency levels and time slots.
@@ -14,7 +15,7 @@ class SelectionTile extends StatelessWidget {
     this.subtitle,
     this.leading,
     this.trailing,
-    this.accent = AppColors.forest,
+    this.accent = AppColors.navy,
   });
 
   final bool selected;
@@ -32,11 +33,11 @@ class SelectionTile extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: selected ? accent.withValues(alpha: 0.05) : AppColors.card,
+        color: AppColors.surface,
         borderRadius: Corners.lgRadius,
         border: Border.all(
-          color: selected ? accent : AppColors.outline,
-          width: selected ? 1.6 : 1.2,
+          color: selected ? accent : AppColors.line,
+          width: selected ? 1.8 : 1,
         ),
       ),
       child: Material(
@@ -60,7 +61,7 @@ class SelectionTile extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkMuted,
+                            color: AppColors.muted,
                           ),
                         ),
                       ],
@@ -69,39 +70,12 @@ class SelectionTile extends StatelessWidget {
                 ),
                 if (trailing != null) ...[Gaps.sm, trailing!],
                 Gaps.md,
-                _RadioDot(selected: selected, accent: accent),
+                RadioDot(selected: selected),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _RadioDot extends StatelessWidget {
-  const _RadioDot({required this.selected, required this.accent});
-
-  final bool selected;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? accent : Colors.transparent,
-        border: Border.all(
-          color: selected ? accent : AppColors.inkFaint,
-          width: 1.6,
-        ),
-      ),
-      child: selected
-          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-          : null,
     );
   }
 }

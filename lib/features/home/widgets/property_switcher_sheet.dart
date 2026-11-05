@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/routing/routes.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/widgets.dart';
 
@@ -24,7 +23,7 @@ class _PropertySwitcherList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final properties = ref.watch(propertiesProvider);
-    final selectedId = ref.watch(selectedPropertyIdProvider);
+    final selectedId = ref.watch(selectedPropertyProvider)?.id;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -49,17 +48,13 @@ class _PropertySwitcherList extends ConsumerWidget {
           ),
           Gaps.md,
         ],
-        OutlinedButton.icon(
+        SecondaryButton(
+          label: 'Add a new home',
+          icon: Icons.add_rounded,
           onPressed: () {
             Navigator.of(context).pop();
             context.push(Routes.addProperty);
           },
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-            foregroundColor: AppColors.teal,
-          ),
-          icon: const Icon(Icons.add_rounded, size: 20),
-          label: const Text('Add a new home'),
         ),
       ],
     );

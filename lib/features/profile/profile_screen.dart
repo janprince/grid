@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,154 +7,136 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/widgets.dart';
 
+/// The account: who you are on a navy header, then everything you can set,
+/// grouped. Shares its shape with GRID Pro's Account tab.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final user = ref.watch(sessionProvider).user;
+    final homes = ref.watch(propertiesProvider).length;
+    final accounts = ref.watch(accountsProvider).length;
 
-    return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(Insets.xl),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        body: ListView(
+          padding: EdgeInsets.zero,
           children: [
-            Text('Profile', style: theme.textTheme.headlineLarge),
-            Gaps.xl,
-            AppCard(
-              padding: const EdgeInsets.all(Insets.xl),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: AppColors.mint,
-                    child: Text(
-                      user?.initials ?? 'G',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: AppColors.forestDeep,
-                      ),
-                    ),
-                  ),
-                  Gaps.lg,
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            _ProfileHeader(
+              initials: user?.initials ?? 'G',
+              name: user?.name ?? 'GRID user',
+              contact: user?.email ?? Fmt.ghanaPhone(user?.phone ?? ''),
+            ),
+            Transform.translate(
+              offset: const Offset(0, -24),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(
+                  Insets.xl,
+                  Insets.xl,
+                  Insets.xl,
+                  Insets.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    MenuGroup(
                       children: [
-                        Text(
-                          user?.name ?? 'GRID user',
-                          style: theme.textTheme.titleLarge,
+                        MenuRow(
+                          icon: Icons.other_houses_outlined,
+                          label: 'My homes',
+                          subtitle: '$homes saved',
+                          onTap: () => context.push(Routes.properties),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          Fmt.ghanaPhone(user?.phone ?? ''),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkMuted,
-                          ),
+                        MenuRow(
+                          icon: Icons.bookmark_outline_rounded,
+                          label: 'Saved accounts',
+                          subtitle: '$accounts meters, cards and numbers',
+                          onTap: () => context.push(Routes.savedAccounts),
                         ),
-                        if (user?.email != null)
-                          Text(
-                            user!.email!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.inkMuted,
-                            ),
-                          ),
+                        MenuRow(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: 'Payment methods',
+                          onTap: () => context.push(Routes.paymentMethods),
+                        ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Profile editing arrives with the live release',
+                    const SectionHeader(
+                      title: 'Preferences',
+                      padding: EdgeInsets.only(top: 24, bottom: Insets.md),
+                    ),
+                    MenuGroup(
+                      children: [
+                        MenuRow(
+                          icon: Icons.notifications_none_rounded,
+                          label: 'Notifications',
+                          onTap: () => context.push(Routes.notifications),
                         ),
+                        MenuRow(
+                          icon: Icons.group_add_outlined,
+                          label: 'Invite family',
+                          value: 'Soon',
+                          onTap: () =>
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Family & shared-home access arrives in '
+                                    'a later release',
+                                  ),
+                                ),
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SectionHeader(
+                      title: 'Help',
+                      padding: EdgeInsets.only(top: 24, bottom: Insets.md),
+                    ),
+                    MenuGroup(
+                      children: [
+                        MenuRow(
+                          icon: Icons.support_agent_rounded,
+                          label: 'Help centre',
+                          onTap: () => context.push(Routes.help),
+                        ),
+                        MenuRow(
+                          icon: Icons.shield_outlined,
+                          label: 'Privacy & security',
+                          onTap: () => context.push(Routes.privacy),
+                        ),
+                      ],
+                    ),
+                    Gaps.lg,
+                    MenuGroup(
+                      children: [
+                        MenuRow(
+                          icon: Icons.logout_rounded,
+                          label: 'Log out',
+                          danger: true,
+                          onTap: () => _logout(context, ref),
+                        ),
+                      ],
+                    ),
+                    Gaps.xl,
+                    const Center(
+                      child: Text(
+                        'GRID · Version 0.1 · demo build',
+                        style: AppText.caption,
                       ),
                     ),
-                    tooltip: 'Edit profile',
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                  ),
-                ],
-              ),
-            ),
-            Gaps.xxl,
-            _SectionLabel('Home & payments'),
-            _SettingsTile(
-              icon: Icons.other_houses_rounded,
-              title: 'Manage homes',
-              subtitle: 'Properties, addresses and primary home',
-              onTap: () => context.push(Routes.properties),
-            ),
-            _SettingsTile(
-              icon: Icons.bookmark_rounded,
-              title: 'Saved utility accounts',
-              subtitle: 'Meters, smartcards and numbers',
-              onTap: () => context.push(Routes.savedAccounts),
-            ),
-            _SettingsTile(
-              icon: Icons.credit_card_rounded,
-              title: 'Payment methods',
-              subtitle: 'Mobile money and cards',
-              onTap: () => context.push(Routes.paymentMethods),
-            ),
-            Gaps.xl,
-            _SectionLabel('Preferences'),
-            _SettingsTile(
-              icon: Icons.notifications_rounded,
-              title: 'Notifications',
-              subtitle: 'Reminders, receipts and job updates',
-              onTap: () => context.push(Routes.notifications),
-            ),
-            _SettingsTile(
-              icon: Icons.group_add_rounded,
-              title: 'Invite household member',
-              subtitle: 'Share access to your homes — coming soon',
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Family & shared-home access arrives in a later release',
-                  ),
+                  ],
                 ),
               ),
             ),
-            Gaps.xl,
-            _SectionLabel('Support'),
-            _SettingsTile(
-              icon: Icons.help_rounded,
-              title: 'Help centre',
-              subtitle: 'FAQs and contact options',
-              onTap: () => context.push(Routes.help),
-            ),
-            _SettingsTile(
-              icon: Icons.shield_rounded,
-              title: 'Privacy & security',
-              subtitle: 'Your data and account safety',
-              onTap: () => context.push(Routes.privacy),
-            ),
-            Gaps.xxl,
-            OutlinedButton.icon(
-              onPressed: () => _logout(context, ref),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.danger,
-                side: BorderSide(
-                  color: AppColors.danger.withValues(alpha: 0.4),
-                ),
-              ),
-              icon: const Icon(Icons.logout_rounded, size: 20),
-              label: const Text('Log out'),
-            ),
-            Gaps.lg,
-            Center(
-              child: Text(
-                'GRID v0.1.0 — demo build',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.inkFaint,
-                ),
-              ),
-            ),
-            Gaps.xl,
           ],
         ),
       ),
@@ -161,97 +144,108 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log out of GRID?'),
-        content: const Text(
-          'Your saved homes and accounts stay on this device.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Stay'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmationSheet(
+      context,
+      title: 'Log out of GRID?',
+      message: ref.read(apiEnabledProvider)
+          ? 'Your homes and saved accounts stay in your GRID account.'
+          : 'Your saved homes and accounts stay on this device.',
+      confirmLabel: 'Log out',
+      cancelLabel: 'Stay',
     );
-    if (confirmed ?? false) {
+    if (confirmed) {
       await ref.read(sessionProvider.notifier).signOut();
     }
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Insets.md),
-      child: Text(
-        label.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.inkFaint,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.initials,
+    required this.name,
+    required this.contact,
   });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  final String initials;
+  final String name;
+  final String contact;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Insets.md),
-      child: AppCard(
-        padding: const EdgeInsets.all(Insets.lg),
-        borderRadius: Corners.lgRadius,
-        onTap: onTap,
-        child: Row(
-          children: [
-            TintedIcon(icon, size: 40),
-            Gaps.md,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.inkMuted,
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.navyDeep, AppColors.navy],
+      ),
+    ),
+    child: Stack(
+      fit: StackFit.passthrough,
+      children: [
+        const GridTexture(),
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Insets.xl, 24, Insets.xl, 50),
+            child: Column(
+              children: [
+                InitialsAvatar(initials: initials, size: 76, onNavy: true),
+                Gaps.lg,
+                Text(
+                  name.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  contact,
+                  style: const TextStyle(
+                    color: AppColors.onNavyMuted,
+                    fontSize: 14,
+                    fontFeatures: AppText.tabularFigures,
+                  ),
+                ),
+                Gaps.md,
+                InkWell(
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Profile editing arrives with the live release',
+                      ),
                     ),
                   ),
-                ],
-              ),
+                  borderRadius: Corners.smRadius,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Edit profile',
+                          style: TextStyle(
+                            color: AppColors.amber,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: AppColors.amber,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.inkFaint),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }

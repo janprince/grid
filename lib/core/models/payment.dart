@@ -62,6 +62,7 @@ class PaymentTransaction {
     this.planName,
     this.token,
     this.failureReason,
+    this.billerReference,
     this.fee = 0,
   });
 
@@ -81,9 +82,12 @@ class PaymentTransaction {
   final String? propertyLabel;
   final String? planName;
 
-  /// ECG power token (demo placeholder).
+  /// An ECG power token, when the biller returns one. Hubtel credits meters directly.
   final String? token;
   final String? failureReason;
+
+  /// The biller's own receipt number.
+  final String? billerReference;
 
   double get total => amount + fee;
 }

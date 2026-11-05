@@ -66,4 +66,12 @@ abstract final class Fmt {
     return '+233 ${local.substring(0, 2)} ${local.substring(2, 5)} '
         '${local.substring(5)}';
   }
+
+  /// "45 seconds", "2 minutes" — for rate-limit waits. Null reads as "a minute".
+  static String waitTime(int? seconds) {
+    if (seconds == null || seconds <= 0) return 'a minute';
+    if (seconds < 60) return '$seconds seconds';
+    final minutes = (seconds / 60).ceil();
+    return minutes == 1 ? '1 minute' : '$minutes minutes';
+  }
 }

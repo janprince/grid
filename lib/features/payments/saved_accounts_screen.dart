@@ -22,12 +22,15 @@ class SavedAccountsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Saved accounts')),
+      appBar: AppHeader(
+        title: 'Saved accounts',
+        onBack: () => Navigator.of(context).maybePop(),
+      ),
       floatingActionButton: accounts.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: () => showAccountFormSheet(context),
-              backgroundColor: AppColors.forestDeep,
+              backgroundColor: AppColors.navy,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add_rounded),
               label: const Text('Add account'),
@@ -60,9 +63,9 @@ class SavedAccountsScreen extends ConsumerWidget {
                     ),
                     child: Text(
                       entry.key.label,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.inkFaint,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium?.copyWith(color: AppColors.faint),
                     ),
                   ),
                   for (final account in entry.value) ...[
@@ -91,7 +94,7 @@ class _AccountCard extends ConsumerWidget {
       onTap: () => showAccountFormSheet(context, existing: account),
       child: Row(
         children: [
-          TintedIcon(account.type.icon),
+          BillerMark(account.type),
           Gaps.md,
           Expanded(
             child: Column(
@@ -121,7 +124,7 @@ class _AccountCard extends ConsumerWidget {
                 Text(
                   account.accountNumber,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.inkMuted,
+                    color: AppColors.muted,
                   ),
                 ),
                 if (property != null) ...[
@@ -129,7 +132,7 @@ class _AccountCard extends ConsumerWidget {
                   Text(
                     '${property.nickname} • ${property.location}',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.inkFaint,
+                      color: AppColors.faint,
                     ),
                   ),
                 ],
@@ -144,15 +147,11 @@ class _AccountCard extends ConsumerWidget {
                 Text(
                   Fmt.lastPaidLabel(account.lastPaidAt!),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.inkFaint,
+                    color: AppColors.faint,
                   ),
                 ),
               const SizedBox(height: 4),
-              const Icon(
-                Icons.edit_outlined,
-                size: 18,
-                color: AppColors.inkFaint,
-              ),
+              const Icon(Icons.edit_outlined, size: 18, color: AppColors.faint),
             ],
           ),
         ],

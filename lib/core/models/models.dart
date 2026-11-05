@@ -1,4 +1,5 @@
 export 'activity_item.dart';
+export 'bill_payment.dart';
 export 'payment.dart';
 export 'property.dart';
 export 'reminder.dart';

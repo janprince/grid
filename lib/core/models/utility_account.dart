@@ -1,3 +1,4 @@
+import 'bill_payment.dart';
 import 'utility_type.dart';
 
 /// A saved payee: an ECG meter, water account, smartcard or phone number.
@@ -12,6 +13,8 @@ class UtilityAccount {
     this.lastPaidAt,
     this.dueDate,
     this.lastAmount,
+    this.network,
+    this.ecgKind,
   });
 
   final String id;
@@ -28,6 +31,19 @@ class UtilityAccount {
   final DateTime? dueDate;
   final double? lastAmount;
 
+  /// Airtime and data only: which network to buy from.
+  final MobileNetwork? network;
+
+  /// ECG only.
+  final EcgKind? ecgKind;
+
+  /// The GRID API product this account is paid with.
+  String get productCode => billProductCode(
+    type,
+    network: network ?? MobileNetwork.guess(accountNumber),
+    ecgKind: ecgKind ?? EcgKind.prepaid,
+  );
+
   UtilityAccount copyWith({
     UtilityType? type,
     String? accountNumber,
@@ -38,6 +54,8 @@ class UtilityAccount {
     DateTime? lastPaidAt,
     DateTime? dueDate,
     double? lastAmount,
+    MobileNetwork? network,
+    EcgKind? ecgKind,
   }) => UtilityAccount(
     id: id,
     type: type ?? this.type,
@@ -50,5 +68,7 @@ class UtilityAccount {
     lastPaidAt: lastPaidAt ?? this.lastPaidAt,
     dueDate: dueDate ?? this.dueDate,
     lastAmount: lastAmount ?? this.lastAmount,
+    network: network ?? this.network,
+    ecgKind: ecgKind ?? this.ecgKind,
   );
 }
