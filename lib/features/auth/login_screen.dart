@@ -62,8 +62,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDemo = !ref.watch(apiEnabledProvider);
-
     return Scaffold(
       body: SafeArea(
         child: Align(
@@ -128,12 +126,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: _continue,
                     ),
                     Gaps.xl,
-                    InfoBanner(
-                      message: isDemo
-                          ? 'Demo sign-in — we will show you a one-time code '
-                                'on the next screen. No SMS is sent.'
-                          : 'We will text a 6-digit code to this number. '
-                                'New to GRID? This creates your account.',
+                    const InfoBanner(
+                      message:
+                          'We will text a 6-digit code to this number. '
+                          'New to GRID? This creates your account.',
                     ),
                   ],
                 ),

@@ -93,22 +93,29 @@ void main() {
     await client(adapter).delete<void>('/properties/p1');
   });
 
-  test('turns an error envelope into ApiException with fields and detail', () async {
-    final adapter = _FakeAdapter(
-      (_) async =>
-          (400, _fail('auth.otp_invalid', detail: {'attemptsRemaining': 3})),
-    );
+  test(
+    'turns an error envelope into ApiException with fields and detail',
+    () async {
+      final adapter = _FakeAdapter(
+        (_) async =>
+            (400, _fail('auth.otp_invalid', detail: {'attemptsRemaining': 3})),
+      );
 
-    await expectLater(
-      client(adapter).post<Object?>('/auth/otp/verify'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', 'auth.otp_invalid')
-            .having((e) => e.attemptsRemaining, 'attempts', 3)
-            .having((e) => e.fieldErrors['accountNumber'], 'field', 'Too short'),
-      ),
-    );
-  });
+      await expectLater(
+        client(adapter).post<Object?>('/auth/otp/verify'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', 'auth.otp_invalid')
+              .having((e) => e.attemptsRemaining, 'attempts', 3)
+              .having(
+                (e) => e.fieldErrors['accountNumber'],
+                'field',
+                'Too short',
+              ),
+        ),
+      );
+    },
+  );
 
   test('concurrent 401s share one refresh, then replay', () async {
     var refreshCalls = 0;

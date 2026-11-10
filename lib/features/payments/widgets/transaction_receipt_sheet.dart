@@ -88,11 +88,6 @@ class TransactionReceiptBody extends StatelessWidget {
           Gaps.md,
           InfoBanner.warning(message: tx.failureReason!),
         ],
-        Gaps.lg,
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [DemoTag()],
-        ),
       ],
     );
   }

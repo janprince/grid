@@ -17,13 +17,6 @@ abstract final class ApiConfig {
     return 'http://$host:8080/api/v1';
   }
 
-  /// Set false to run entirely on bundled mock data (useful for demos offline):
-  /// `flutter run --dart-define=GRID_USE_API=false`
-  static const useApi = bool.fromEnvironment(
-    'GRID_USE_API',
-    defaultValue: true,
-  );
-
   /// Sent as `X-Grid-App` so the API records which app a person signs in from.
   static const appId = 'consumer';
 

@@ -37,12 +37,11 @@ class AppUser {
   /// False until the person has told GRID their name after first sign-in.
   final bool profileComplete;
 
-  /// First name as the person typed it; null for older demo sessions.
+  /// First name as the person typed it; null when only a full name is known.
   final String? givenName;
 
-  String get firstName => (givenName?.isNotEmpty ?? false)
-      ? givenName!
-      : name.split(' ').first;
+  String get firstName =>
+      (givenName?.isNotEmpty ?? false) ? givenName! : name.split(' ').first;
 
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+'))

@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Thin wrapper over SharedPreferences for the few flags GRID persists
-/// locally: onboarding completion and the mock auth session.
+/// locally.
 class AppPrefs {
   AppPrefs(this._prefs);
 

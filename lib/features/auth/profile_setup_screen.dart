@@ -23,9 +23,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   late final _firstNameController = TextEditingController(
     text: _user?.firstName,
   );
-  late final _lastNameController = TextEditingController(
-    text: _user?.lastName,
-  );
+  late final _lastNameController = TextEditingController(text: _user?.lastName);
   late final _emailController = TextEditingController(text: _user?.email);
   bool _saving = false;
   Map<String, String> _fieldErrors = const {};
