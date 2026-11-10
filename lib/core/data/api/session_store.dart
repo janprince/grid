@@ -33,7 +33,9 @@ class Session {
   /// Reads the token-pair response shared by verify and refresh.
   factory Session.fromAuthResponse(Map<String, dynamic> data) => Session(
     accessToken: data['accessToken'] as String,
-    accessTokenExpiresAt: DateTime.parse(data['accessTokenExpiresAt'] as String),
+    accessTokenExpiresAt: DateTime.parse(
+      data['accessTokenExpiresAt'] as String,
+    ),
     refreshToken: data['refreshToken'] as String,
     user: data['user'] as Map<String, dynamic>,
   );

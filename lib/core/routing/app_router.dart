@@ -17,7 +17,7 @@ import '../../features/profile/settings_screens.dart';
 import '../../features/properties/add_edit_property_screen.dart';
 import '../../features/properties/property_details_screen.dart';
 import '../../features/properties/properties_screen.dart';
-import '../../features/services/booking_flow_screen.dart';
+import '../../features/services/booking_coming_soon_screen.dart';
 import '../../features/services/request_details_screen.dart';
 import '../../features/services/services_hub_screen.dart';
 import '../models/models.dart';
@@ -153,8 +153,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.bookService,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) =>
-            BookingFlowScreen(args: state.extra as BookingArgs?),
+        builder: (context, state) => const BookingComingSoonScreen(),
       ),
       GoRoute(
         path: '/services/request/:id',

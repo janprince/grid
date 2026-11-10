@@ -1,16 +1,53 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/app_providers.dart';
 import '../theme/app_colors.dart';
 
 /// The five-tab shell: Home, Pay, Services, Activity, Profile.
 ///
 /// Hand-built rather than a stock `NavigationBar`, and shaped like GRID
 /// Pro's: the selected tab sits on a soft navy tile.
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
+
+  @override
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  // Tabs stay alive between visits, so nothing reloads on its own: a payment
+  // that settled while the app was elsewhere has to be fetched here.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: _reloadHistory,
+  );
+
+  StatefulNavigationShell get shell => widget.shell;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _reloadHistory() =>
+      unawaited(ref.read(transactionsProvider.notifier).refresh());
+
+  void _select(int index) {
+    if (index != shell.currentIndex) _reloadHistory();
+    shell.goBranch(index, initialLocation: index == shell.currentIndex);
+  }
 
   static const _tabs = [
     (Icons.house_outlined, Icons.house_rounded, 'Home'),
@@ -46,10 +83,7 @@ class MainShell extends StatelessWidget {
                       selectedIcon: _tabs[i].$2,
                       label: _tabs[i].$3,
                       selected: shell.currentIndex == i,
-                      onTap: () => shell.goBranch(
-                        i,
-                        initialLocation: i == shell.currentIndex,
-                      ),
+                      onTap: () => _select(i),
                     ),
                   ),
               ],

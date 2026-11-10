@@ -285,11 +285,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     if (order.status != BillOrderStatus.completed) return;
     final saved = _selectedAccount;
     if (saved != null) {
-      ref.read(apiEnabledProvider)
-          ? unawaited(ref.read(accountsProvider.notifier).refresh())
-          : ref
-                .read(accountsProvider.notifier)
-                .markPaid(saved.id, order.principal);
+      unawaited(ref.read(accountsProvider.notifier).refresh());
     } else if (_saveNew) {
       unawaited(
         _savePayee(
@@ -909,7 +905,10 @@ class _ApprovalViewState extends ConsumerState<_ApprovalView> {
           child: Text(paid ? 'Check again' : 'I\'ve approved it'),
         ),
         TextButton(
-          onPressed: () => context.go(Routes.activity),
+          onPressed: () {
+            unawaited(ref.read(transactionsProvider.notifier).refresh());
+            context.go(Routes.activity);
+          },
           child: const Text('Continue in Activity'),
         ),
       ],

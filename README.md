@@ -7,8 +7,7 @@ keep every home, meter and receipt organised in one place.
 
 This repository contains the **mobile MVP**. Sign-in, the profile, homes
 and saved utility accounts run against the GRID API (`../Grid.API`).
-Payments and service bookings are still simulated on local mock data and
-clearly labelled as demo.
+Bill payments are live through the GRID API. Service booking isn't open yet.
 
 ## Run it
 
@@ -32,10 +31,6 @@ dashboard.
 - **Base URL.** It defaults to `http://10.0.2.2:8080/api/v1` on the Android
   emulator and `http://127.0.0.1:8080/api/v1` elsewhere. On a physical device,
   override it with `--dart-define=GRID_API_BASE_URL=http://<your-ip>:8080/api/v1`.
-- **Offline demo.** `--dart-define=GRID_USE_API=false` runs everything on mock
-  data, with Kwame Mensah's seeded homes and accounts.
-- **Web.** The browser build only works in mock mode, because the API sends
-  no CORS headers.
 
 ```bash
 flutter test      # widget smoke tests incl. the ECG purchase golden path
@@ -50,7 +45,7 @@ flutter analyze
 | `go_router` | Navigation — `StatefulShellRoute` for the 5 tabs + full-screen flows |
 | `dio` | HTTP client for the GRID API (`core/data/api/api_client.dart`) |
 | `flutter_secure_storage` | Access and refresh tokens |
-| `shared_preferences` | Persists onboarding completion and the demo-mode session |
+| `shared_preferences` | Persists onboarding completion |
 | `intl` | GHS currency and date formatting |
 
 ## Project structure
@@ -65,7 +60,7 @@ lib/
     widgets/                # design system: cards, badges, tiles, empty states,
                             # receipts, step-flow scaffold, skeletons, banners
     models/                 # typed domain models (see below)
-    data/                   # repository interfaces + mock impls, mock seed
+    data/                   # repository interfaces and the live API client
                             # data, SharedPreferences wrapper
       api/                  # GRID API client (envelope, 401 refresh,
                             # X-Grid-App), secure session store, live repos
@@ -98,9 +93,9 @@ utility types.
 
 ## What talks to the API
 
-`AuthApi`, `PropertiesApi` and `UtilityAccountsApi` have live
-implementations in `lib/core/data/api/live_repositories.dart`, selected by
-`apiEnabledProvider`. The client contract they follow is
+`AuthApi`, `PropertiesApi`, `UtilityAccountsApi` and `BillPaymentsApi` have
+live implementations in `lib/core/data/api/live_repositories.dart`. The client
+contract they follow is
 [`../DOCUMENTATION/api-integration.md`](../DOCUMENTATION/api-integration.md).
 
 - The server owns `isPrimary` and `isDefault`. Every change is followed by
@@ -110,38 +105,11 @@ implementations in `lib/core/data/api/live_repositories.dart`, selected by
 - Refresh tokens rotate, so `ApiClient` collapses concurrent 401s onto one
   refresh and then replays the failed requests.
 
-## What is mocked
+## Not built yet
 
-- **Authentication in demo mode** — `MockAuthApi`: any valid phone works,
-  the OTP is `123456`, and the session is stored in SharedPreferences.
-- **Homes and saved accounts in demo mode** — `MockHomeStore`, which
-  follows the server's rules (first home is primary, one default per
-  utility).
-- **Payments** — `MockPaymentsApi`: simulated latency, generated
-  transaction references and ECG token placeholders. The "Demo Declined
-  Card" payment method deterministically fails so the failure UX can be
-  exercised. No money moves anywhere.
-- **Service dispatch** — `MockServicesApi`: requests are created locally
-  in the *Pending* state; seeded requests demonstrate assigned,
-  in-progress, completed and cancelled states.
-- **Seed data** — `lib/core/data/mock_data.dart`: Kwame Mensah, three
-  homes (East Legon, Kumasi, Spintex), saved meters/smartcards/numbers,
-  reminders and a realistic payment history. Dates are computed relative
-  to "now" so labels like "Due tomorrow" stay believable.
-
-## Where live APIs plug in later
-
-Payments and services still sit behind mock-only interfaces in
-`lib/core/data/repositories.dart`:
-
-- `PaymentsApi` → utility biller aggregator / payment processor
-- `ServicesApi` → provider dispatch backend
-
-Give each a live implementation next to the others in `core/data/api/`,
-and choose it in `paymentsApiProvider` / `servicesApiProvider` the way
-`propertiesApiProvider` does. Screens and flows need no
-changes. Catalog data (TV bouquets, data bundles, fibre plans) currently
-comes from `CatalogRepository` and would move server-side the same way.
+Service booking has no API, so the booking route shows a "coming soon" screen
+and the Services tab has no requests. Reminders are empty for the same reason.
+The widget tests run on in-memory fakes in `test/support/fakes.dart`.
 
 ## Design system
 

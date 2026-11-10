@@ -2,17 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grid/app/app.dart';
+import 'package:grid/core/data/app_prefs.dart';
+import 'package:grid/core/models/models.dart';
 import 'package:grid/core/providers/app_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<ProviderScope> _app({required Map<String, Object> prefs}) async {
+import 'support/fakes.dart';
+
+Future<ProviderScope> _app({
+  required Map<String, Object> prefs,
+  FakeBillPaymentsApi? bills,
+}) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sharedPrefs = await SharedPreferences.getInstance();
+  final homes = FakeHomeStore();
   return ProviderScope(
     overrides: [
       sharedPrefsProvider.overrideWithValue(sharedPrefs),
-      // The widget tests run on the bundled mock data, never the network.
-      apiEnabledProvider.overrideWithValue(false),
+      // The widget tests run on in-memory fakes, never the network.
+      authApiProvider.overrideWithValue(FakeAuthApi(AppPrefs(sharedPrefs))),
+      propertiesApiProvider.overrideWithValue(homes),
+      utilityAccountsApiProvider.overrideWithValue(
+        FakeUtilityAccountsApi(homes),
+      ),
+      billPaymentsApiProvider.overrideWithValue(bills ?? FakeBillPaymentsApi()),
     ],
     child: const GridApp(),
   );
@@ -76,9 +89,7 @@ void main() {
     expect(find.text('My Home'), findsWidgets);
   });
 
-  testWidgets('logged-in user lands on the dashboard with mock data', (
-    tester,
-  ) async {
+  testWidgets('logged-in user lands on the dashboard', (tester) async {
     await tester.pumpWidget(
       await _app(
         prefs: {
@@ -100,15 +111,6 @@ void main() {
     expect(find.text('TOP UP POWER'), findsOneWidget);
     expect(find.text('Buy ECG'), findsOneWidget);
     expect(find.text('Book a service'), findsOneWidget);
-
-    // Reminders render further down the scroll view.
-    await tester.scrollUntilVisible(
-      find.text('DStv expires tomorrow'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Upcoming reminders'), findsOneWidget);
-    expect(find.text('DStv expires tomorrow'), findsOneWidget);
   });
 
   testWidgets('ECG purchase golden path completes with a receipt', (
@@ -145,7 +147,7 @@ void main() {
 
     // Amount step — the biller's name for the meter, then a quick amount.
     expect(find.text('How much?'), findsOneWidget);
-    expect(find.text('GRID Demo Customer'), findsOneWidget);
+    expect(find.text('Test Customer'), findsOneWidget);
     await tester.tap(find.text('GH₵ 100'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('CONTINUE'));
@@ -165,6 +167,46 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Payment successful'), findsOneWidget);
     expect(find.text('BACK TO HOME'), findsOneWidget);
+  });
+
+  testWidgets('opening Activity shows an order that settled in the meantime', (
+    tester,
+  ) async {
+    final bills = FakeBillPaymentsApi();
+    await tester.pumpWidget(
+      await _app(
+        prefs: {
+          'onboarding_done': true,
+          'logged_in': true,
+          'user_name': 'Kwame Mensah',
+          'user_phone': '+233551234567',
+        },
+        bills: bills,
+      ),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // The list already loaded, empty, before this order finished.
+    bills.addFromServer(
+      BillOrder(
+        id: 'o1',
+        reference: 'GRID-TEST',
+        productCode: 'EcgPrepaid',
+        accountNumber: 'P20314039',
+        customerName: 'Paid Meter Owner',
+        principal: 1,
+        fee: 0,
+        total: 1,
+        status: BillOrderStatus.completed,
+        createdAt: DateTime.now(),
+        channel: 'mtn-gh',
+      ),
+    );
+
+    await tester.tap(find.text('Activity'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Paid Meter Owner'), findsOneWidget);
   });
 
   testWidgets('bottom navigation reaches all five tabs', (tester) async {

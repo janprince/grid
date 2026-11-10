@@ -6,8 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/widgets.dart';
 
-/// Saved payment methods (mock — adding real methods needs the live
-/// payments integration).
+/// The wallet GRID charges: mobile money on the signed-in number.
 class PaymentMethodsScreen extends ConsumerWidget {
   const PaymentMethodsScreen({super.key});
 
@@ -38,9 +37,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                         Text(method.label, style: theme.textTheme.titleMedium),
                         const SizedBox(height: 2),
                         Text(
-                          method.alwaysFails
-                              ? 'Demo — always declines'
-                              : method.maskedNumber,
+                          method.maskedNumber,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: AppColors.muted,
                           ),
@@ -49,25 +46,19 @@ class PaymentMethodsScreen extends ConsumerWidget {
                     ),
                   ),
                   if (method.isDefault)
-                    const StatusBadge(label: 'Default', tone: BadgeTone.success)
-                  else if (method.alwaysFails)
-                    const StatusBadge(label: 'Demo', tone: BadgeTone.warning),
+                    const StatusBadge(
+                      label: 'Default',
+                      tone: BadgeTone.success,
+                    ),
                 ],
               ),
             ),
             Gaps.md,
           ],
-          Gaps.sm,
-          SecondaryButton(
-            label: 'Add payment method',
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Adding payment methods arrives with the live release',
-                ),
-              ),
-            ),
-            icon: Icons.add_rounded,
+          const InfoBanner(
+            message:
+                'Payments are charged to the mobile money wallet on the '
+                'number you signed in with.',
           ),
         ],
       ),
@@ -176,10 +167,9 @@ class HelpCentreScreen extends StatelessWidget {
 
   static const _faqs = [
     (
-      'How do ECG prepaid tokens work?',
-      'After a successful top-up you receive a 20-digit token. Enter it on '
-          'your meter keypad to load the credit. In this demo the token is '
-          'a placeholder.',
+      'How do ECG prepaid top-ups work?',
+      'Pay for your meter in GRID and we send the payment to ECG. Your '
+          'receipt in Activity shows the reference ECG gave the payment.',
     ),
     (
       'Who are the service professionals?',
@@ -198,8 +188,8 @@ class HelpCentreScreen extends StatelessWidget {
     ),
     (
       'Is my money safe?',
-      'This is a demo build: no real payments happen. The live release '
-          'uses licensed payment partners for mobile money and cards.',
+      'Payments run through Hubtel, our licensed payment partner. If a '
+          'bill can\'t be paid, the money goes back to your wallet.',
     ),
   ];
 
@@ -240,7 +230,9 @@ class HelpCentreScreen extends StatelessWidget {
                 PrimaryButton(
                   label: 'Call',
                   onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Calling is a demo action')),
+                    const SnackBar(
+                      content: Text('Calling isn\'t available yet'),
+                    ),
                   ),
                   expand: false,
                 ),
@@ -368,8 +360,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           const InfoBanner(
             icon: Icons.lock_rounded,
             message:
-                'This demo stores everything on your device only. '
-                'Nothing is sent to a server.',
+                'Your homes, saved accounts and payments are kept in your '
+                'GRID account, which only your phone number can sign in to.',
           ),
         ],
       ),

@@ -1,13 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/api/api_client.dart';
-import '../data/api/api_config.dart';
 import '../data/api/live_repositories.dart';
 import '../data/api/session_store.dart';
 import '../data/app_prefs.dart';
-import '../data/mock_data.dart';
 import '../data/repositories.dart';
 import '../models/models.dart';
 
@@ -20,10 +20,6 @@ final appPrefsProvider = Provider<AppPrefs>(
   (ref) => AppPrefs(ref.watch(sharedPrefsProvider)),
 );
 
-/// Whether the app talks to the GRID API. Tests and offline demos run on mock
-/// data: `--dart-define=GRID_USE_API=false`.
-final apiEnabledProvider = Provider<bool>((ref) => ApiConfig.useApi);
-
 /// Overridden in main() with an instance whose session is already loaded, so
 /// the first route can be decided synchronously.
 final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
@@ -32,38 +28,28 @@ final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(ref.watch(sessionStoreProvider)),
 );
 
-/// Demo-mode homes and saved accounts, shared so their rules can see each other.
-final _mockHomeStoreProvider = Provider<MockHomeStore>(
-  (ref) => MockHomeStore(),
-);
-
 final authApiProvider = Provider<AuthApi>(
-  (ref) => ref.watch(apiEnabledProvider)
-      ? LiveAuthApi(
-          ref.watch(apiClientProvider),
-          ref.watch(sessionStoreProvider),
-        )
-      : MockAuthApi(ref.watch(appPrefsProvider)),
+  (ref) => LiveAuthApi(
+    ref.watch(apiClientProvider),
+    ref.watch(sessionStoreProvider),
+  ),
 );
 
 final propertiesApiProvider = Provider<PropertiesApi>(
-  (ref) => ref.watch(apiEnabledProvider)
-      ? LivePropertiesApi(ref.watch(apiClientProvider))
-      : ref.watch(_mockHomeStoreProvider),
+  (ref) => LivePropertiesApi(ref.watch(apiClientProvider)),
 );
 
 final utilityAccountsApiProvider = Provider<UtilityAccountsApi>(
-  (ref) => ref.watch(apiEnabledProvider)
-      ? LiveUtilityAccountsApi(ref.watch(apiClientProvider))
-      : MockUtilityAccountsApi(ref.watch(_mockHomeStoreProvider)),
+  (ref) => LiveUtilityAccountsApi(ref.watch(apiClientProvider)),
 );
 
 final billPaymentsApiProvider = Provider<BillPaymentsApi>(
-  (ref) => ref.watch(apiEnabledProvider)
-      ? LiveBillPaymentsApi(ref.watch(apiClientProvider))
-      : MockBillPaymentsApi(),
+  (ref) => LiveBillPaymentsApi(ref.watch(apiClientProvider)),
 );
-final servicesApiProvider = Provider<ServicesApi>((ref) => MockServicesApi());
+
+final servicesApiProvider = Provider<ServicesApi>(
+  (ref) => UnavailableServicesApi(),
+);
 
 // ---------------------------------------------------------------------------
 // Session
@@ -82,11 +68,9 @@ class SessionState {
 class SessionNotifier extends Notifier<SessionState> {
   @override
   SessionState build() {
-    if (ref.watch(apiEnabledProvider)) {
-      // A refresh token the server rejects ends the session everywhere.
-      ref.watch(apiClientProvider).onSessionExpired = () =>
-          state = const SessionState(status: AuthStatus.loggedOut);
-    }
+    // A refresh token the server rejects ends the session everywhere.
+    ref.watch(apiClientProvider).onSessionExpired = () =>
+        state = const SessionState(status: AuthStatus.loggedOut);
     if (!ref.watch(appPrefsProvider).onboardingDone) {
       return const SessionState(status: AuthStatus.needsOnboarding);
     }
@@ -318,17 +302,6 @@ class AccountsNotifier extends _ServerListNotifier<UtilityAccount> {
     await _api.archive(id);
     await refresh();
   }
-
-  /// Shows a payment on a saved account straight away. The live server works
-  /// this out itself; the next reload replaces it with the server's figure.
-  void markPaid(String id, double amount) {
-    state = [
-      for (final a in state)
-        a.id == id
-            ? a.copyWith(lastPaidAt: DateTime.now(), lastAmount: amount)
-            : a,
-    ];
-  }
 }
 
 final accountsProvider =
@@ -351,16 +324,39 @@ final accountsByTypeProvider =
 // Transactions
 // ---------------------------------------------------------------------------
 
-/// Bill payment history, read from the orders API. Demo mode adds the
-/// bundled sample transactions underneath.
+/// Bill payment history, read from the orders API.
+///
+/// A payment can take minutes to settle, and people leave the waiting screen
+/// before it does, so while a recent one is unfinished the list keeps
+/// reloading itself.
 class TransactionsNotifier extends _ServerListNotifier<PaymentTransaction> {
+  static const _followEvery = Duration(seconds: 15);
+  static const _followFor = Duration(minutes: 30);
+
+  Timer? _followUp;
+
+  @override
+  List<PaymentTransaction> build() {
+    ref.onDispose(() => _followUp?.cancel());
+    return super.build();
+  }
+
   @override
   Future<List<PaymentTransaction>> fetch() async {
     final orders = await ref.read(billPaymentsApiProvider).history();
-    final live = [for (final order in orders) _describe(order)];
-    return ref.read(apiEnabledProvider)
-        ? live
-        : [...live, ...MockData.transactions];
+    return [for (final order in orders) _describe(order)];
+  }
+
+  @override
+  void onLoaded() {
+    _followUp?.cancel();
+    final now = DateTime.now();
+    final settling = state.any(
+      (t) =>
+          t.status == TransactionStatus.pending &&
+          now.difference(t.createdAt) < _followFor,
+    );
+    if (settling) _followUp = Timer(_followEvery, refresh);
   }
 
   /// The order as a transaction, named the way the person saved it.
@@ -387,7 +383,7 @@ final transactionsProvider =
 
 class ServiceRequestsNotifier extends Notifier<List<ServiceRequest>> {
   @override
-  List<ServiceRequest> build() => List.of(MockData.serviceRequests);
+  List<ServiceRequest> build() => const [];
 
   void insert(ServiceRequest request) => state = [request, ...state];
 
@@ -430,7 +426,7 @@ final serviceRequestByIdProvider = Provider.family<ServiceRequest?, String>((
 // Reminders & activity
 // ---------------------------------------------------------------------------
 
-final remindersProvider = Provider<List<Reminder>>((ref) => MockData.reminders);
+final remindersProvider = Provider<List<Reminder>>((ref) => const []);
 
 final activityProvider = Provider<List<ActivityItem>>((ref) {
   final txs = ref.watch(transactionsProvider);
@@ -442,10 +438,20 @@ final activityProvider = Provider<List<ActivityItem>>((ref) {
   return items;
 });
 
-final paymentMethodsProvider = Provider<List<PaymentMethod>>(
-  (ref) => CatalogRepository.paymentMethods,
-);
-
-final plansProvider = Provider.family<List<UtilityPlan>, UtilityType>(
-  (ref, type) => CatalogRepository.plansFor(type),
-);
+/// GRID charges the mobile money wallet on the signed-in number; there are no
+/// other methods to save yet.
+final paymentMethodsProvider = Provider<List<PaymentMethod>>((ref) {
+  final phone = ref.watch(sessionProvider).user?.phone;
+  if (phone == null) return const [];
+  final digits = phone.replaceAll(RegExp(r'\D'), '');
+  return [
+    PaymentMethod(
+      id: 'momo',
+      kind: PaymentMethodKind.momo,
+      label: MobileNetwork.guess(phone)?.walletLabel ?? 'Mobile Money',
+      maskedNumber:
+          '•••• ${digits.substring(digits.length < 4 ? 0 : digits.length - 4)}',
+      isDefault: true,
+    ),
+  ];
+});

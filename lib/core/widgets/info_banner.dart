@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
-/// Soft tinted callout with an icon — used for demo notices, pricing
+/// Soft tinted callout with an icon — used for notices, pricing
 /// transparency and verification messages.
 class InfoBanner extends StatelessWidget {
   const InfoBanner({
@@ -49,31 +49,6 @@ class InfoBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Small "Demo" tag stamped on receipts and transactions until live
-/// integrations exist.
-class DemoTag extends StatelessWidget {
-  const DemoTag({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Insets.sm, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.warningBg,
-        borderRadius: Corners.pill,
-      ),
-      child: Text(
-        'DEMO',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.warning,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1,
-        ),
       ),
     );
   }

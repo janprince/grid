@@ -108,9 +108,22 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
             ],
             Gaps.md,
             Expanded(
-              child: items.isEmpty
-                  ? _emptyState(context)
-                  : _GroupedActivityList(items: items),
+              child: RefreshIndicator(
+                onRefresh: ref.read(transactionsProvider.notifier).refresh,
+                child: items.isEmpty
+                    ? LayoutBuilder(
+                        builder: (context, constraints) => ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: constraints.maxHeight,
+                              child: _emptyState(context),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _GroupedActivityList(items: items),
+              ),
             ),
           ],
         ),
@@ -176,6 +189,7 @@ class _GroupedActivityList extends StatelessWidget {
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(Insets.md, 0, Insets.md, Insets.xxxl),
       itemCount: entries.length,
       itemBuilder: (context, i) {

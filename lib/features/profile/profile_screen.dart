@@ -128,10 +128,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     Gaps.xl,
                     const Center(
-                      child: Text(
-                        'GRID · Version 0.1 · demo build',
-                        style: AppText.caption,
-                      ),
+                      child: Text('GRID · Version 0.1', style: AppText.caption),
                     ),
                   ],
                 ),
@@ -147,9 +144,7 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showConfirmationSheet(
       context,
       title: 'Log out of GRID?',
-      message: ref.read(apiEnabledProvider)
-          ? 'Your homes and saved accounts stay in your GRID account.'
-          : 'Your saved homes and accounts stay on this device.',
+      message: 'Your homes and saved accounts stay in your GRID account.',
       confirmLabel: 'Log out',
       cancelLabel: 'Stay',
     );

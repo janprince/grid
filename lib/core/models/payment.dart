@@ -11,7 +11,6 @@ class PaymentMethod {
     required this.label,
     required this.maskedNumber,
     this.isDefault = false,
-    this.alwaysFails = false,
   });
 
   final String id;
@@ -20,28 +19,9 @@ class PaymentMethod {
   final String maskedNumber;
   final bool isDefault;
 
-  /// Demo-only method that deterministically declines, so the failed
-  /// payment experience can be exercised without a backend.
-  final bool alwaysFails;
-
   IconData get icon => kind == PaymentMethodKind.momo
       ? Icons.account_balance_wallet_rounded
       : Icons.credit_card_rounded;
-}
-
-/// A package for plan-based utilities (TV bouquets, data bundles, fibre).
-class UtilityPlan {
-  const UtilityPlan({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.description,
-  });
-
-  final String id;
-  final String name;
-  final double price;
-  final String description;
 }
 
 enum TransactionStatus { success, pending, failed }

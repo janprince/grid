@@ -35,11 +35,7 @@ class RequestDetailsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppHeader(
-        title: request.reference,
-        onBack: () => context.pop(),
-        trailing: const DemoTag(),
-      ),
+      appBar: AppHeader(title: request.reference, onBack: () => context.pop()),
       body: ListView(
         padding: const EdgeInsets.all(Insets.xl),
         children: [
@@ -228,10 +224,10 @@ class RequestDetailsScreen extends ConsumerWidget {
           ListTile(
             leading: const TintedIcon(Icons.call_rounded, size: 40),
             title: const Text('Call GRID support'),
-            subtitle: const Text('030 700 0000 • 7am – 9pm'),
+            subtitle: const Text('Coming soon'),
             contentPadding: EdgeInsets.zero,
             onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Calling is a demo action')),
+              const SnackBar(content: Text('Calling isn\'t available yet')),
             ),
           ),
           ListTile(
