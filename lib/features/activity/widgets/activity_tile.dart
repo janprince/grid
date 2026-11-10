@@ -49,7 +49,7 @@ class ActivityTile extends StatelessWidget {
         child: Row(
           children: [
             if (item.utilityType != null)
-              BillerMark(item.utilityType!)
+              BillerMark(item.utilityType!, network: item.transaction?.network)
             else if (item.request != null)
               ServiceBadge(category: item.request!.category)
             else

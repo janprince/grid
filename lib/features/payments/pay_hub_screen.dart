@@ -145,7 +145,7 @@ class _SavedAccountCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                BillerMark(account.type, size: 34),
+                BillerMark(account.type, size: 34, network: account.network),
                 const Spacer(),
                 if (dueSoon)
                   const StatusBadge(label: 'Due soon', tone: BadgeTone.warning)
@@ -255,7 +255,7 @@ class _RecentPaymentTile extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            BillerMark(tx.type),
+            BillerMark(tx.type, network: tx.network),
             Gaps.md,
             Expanded(
               child: Column(

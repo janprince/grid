@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:grid/core/theme/biller_brand.dart';
 import 'package:grid/core/data/api/api_client.dart';
 import 'package:grid/core/data/api/live_repositories.dart';
 import 'package:grid/core/data/api/session_store.dart';
@@ -248,6 +251,34 @@ void main() {
       expect(lookup.chargePercent, 1);
     },
   );
+
+  test('airtime and data show the network they were bought on', () {
+    expect(MobileNetwork.ofProduct('MtnAirtime'), MobileNetwork.mtn);
+    expect(MobileNetwork.ofProduct('TelecelData'), MobileNetwork.telecel);
+    expect(MobileNetwork.ofProduct('AtData'), MobileNetwork.airtelTigo);
+    expect(MobileNetwork.ofProduct('TelecelBroadband'), isNull);
+    expect(MobileNetwork.ofProduct('EcgPrepaid'), isNull);
+
+    expect(
+      BillerBrand.resolve(UtilityType.airtime, MobileNetwork.mtn).assetPath,
+      'assets/images/billers/mtn.webp',
+    );
+    expect(BillerBrand.resolve(UtilityType.airtime, null).assetPath, isNull);
+    expect(
+      BillerBrand.resolve(UtilityType.ecg, MobileNetwork.mtn).assetPath,
+      'assets/images/billers/ecg.webp',
+    );
+  });
+
+  test('every biller logo file exists', () {
+    final brands = [
+      ...UtilityType.values.map(BillerBrand.of),
+      ...MobileNetwork.values.map(BillerBrand.ofNetwork),
+    ];
+    for (final brand in brands.where((b) => b.assetPath != null)) {
+      expect(File(brand.assetPath!).existsSync(), isTrue, reason: brand.asset);
+    }
+  });
 
   test('product codes follow the network and ECG kind', () {
     expect(

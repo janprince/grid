@@ -150,7 +150,7 @@ class PropertyDetailsScreen extends ConsumerWidget {
                 onTap: () => showAccountFormSheet(context, existing: account),
                 child: Row(
                   children: [
-                    BillerMark(account.type),
+                    BillerMark(account.type, network: account.network),
                     Gaps.md,
                     Expanded(
                       child: Column(

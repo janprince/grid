@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'bill_payment.dart';
 import 'utility_type.dart';
 
 enum PaymentMethodKind { momo, card }
@@ -43,6 +44,7 @@ class PaymentTransaction {
     this.token,
     this.failureReason,
     this.billerReference,
+    this.network,
     this.fee = 0,
   });
 
@@ -68,6 +70,9 @@ class PaymentTransaction {
 
   /// The biller's own receipt number.
   final String? billerReference;
+
+  /// Airtime and data: the network the purchase was made on.
+  final MobileNetwork? network;
 
   double get total => amount + fee;
 }

@@ -443,7 +443,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
             subtitle:
                 '${Fmt.masked(account.accountNumber)}'
                 '${account.lastPaidAt != null ? ' • ${Fmt.lastPaidLabel(account.lastPaidAt!)}' : ''}',
-            leading: BillerMark(type, size: 40),
+            leading: BillerMark(type, size: 40, network: account.network),
             trailing: account.isDefault
                 ? const StatusBadge(label: 'Default', tone: BadgeTone.success)
                 : null,
@@ -571,6 +571,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
               ? lookup!.customerName
               : _accountNickname,
           number: lookup?.accountNumber ?? _accountNumber,
+          network: _network,
           property: type.isPhoneAccount ? null : property,
           onChangeProperty: type.isPhoneAccount ? null : _pickProperty,
         ),
@@ -702,10 +703,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
               selected: n == _wallet,
               onTap: () => Navigator.of(context).pop(n),
               title: n.walletLabel,
-              leading: const TintedIcon(
-                Icons.account_balance_wallet_rounded,
-                size: 40,
-              ),
+              leading: NetworkMark(n),
             ),
             Gaps.md,
           ],
@@ -738,7 +736,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
           padding: const EdgeInsets.all(Insets.xl),
           child: Column(
             children: [
-              BillerMark(type, size: 52),
+              BillerMark(type, size: 52, network: _network),
               Gaps.md,
               Text(Fmt.cedis(amount), style: theme.textTheme.displaySmall),
               Text(
@@ -821,6 +819,8 @@ class _NetworkPicker extends StatelessWidget {
       children: [
         for (final n in MobileNetwork.values)
           ChoiceChip(
+            avatar: NetworkMark(n, size: 20),
+            showCheckmark: false,
             label: Text(n.label),
             selected: n == selected,
             onSelected: (_) => onSelected(n),
@@ -977,10 +977,12 @@ class _PayingForCard extends StatelessWidget {
     required this.nickname,
     required this.number,
     required this.property,
+    this.network,
     this.onChangeProperty,
   });
 
   final UtilityType type;
+  final MobileNetwork? network;
   final String nickname;
   final String number;
   final Property? property;
@@ -992,12 +994,12 @@ class _PayingForCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(Insets.lg),
       decoration: BoxDecoration(
-        color: type.brand.tint,
+        color: BillerBrand.resolve(type, network).tint,
         borderRadius: Corners.lgRadius,
       ),
       child: Row(
         children: [
-          BillerMark(type, size: 40),
+          BillerMark(type, size: 40, network: network),
           Gaps.md,
           Expanded(
             child: Column(

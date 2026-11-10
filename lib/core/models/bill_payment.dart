@@ -60,6 +60,17 @@ enum MobileNetwork {
     return digits.length == 9 ? _prefixes[digits.substring(0, 2)] : null;
   }
 
+  /// The network an airtime or data product is bought from.
+  static MobileNetwork? ofProduct(String productCode) {
+    if (!productCode.endsWith('Airtime') && !productCode.endsWith('Data')) {
+      return null;
+    }
+    for (final n in values) {
+      if (productCode.startsWith(n.productPrefix)) return n;
+    }
+    return null;
+  }
+
   static MobileNetwork? fromChannel(String? channel) {
     for (final n in values) {
       if (n.channel == channel) return n;
@@ -350,5 +361,6 @@ extension BillOrderView on BillOrder {
         ? null
         : message,
     billerReference: billExternalReference,
+    network: MobileNetwork.ofProduct(productCode),
   );
 }

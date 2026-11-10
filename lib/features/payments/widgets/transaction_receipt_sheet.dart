@@ -39,7 +39,7 @@ class TransactionReceiptBody extends StatelessWidget {
       children: [
         Row(
           children: [
-            BillerMark(tx.type),
+            BillerMark(tx.type, network: tx.network),
             Gaps.md,
             Expanded(
               child: Column(
