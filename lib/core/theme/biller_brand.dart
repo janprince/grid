@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/bill_payment.dart';
 import '../models/utility_type.dart';
 
 /// Brand identity for each biller GRID pays.
@@ -31,18 +32,20 @@ class BillerBrand {
   /// A pale wash of [color] for backgrounds behind the mark.
   final Color tint;
 
-  /// Logo file under `assets/images/billers/`, or null where the biller is
-  /// an aggregate of several networks (airtime and data span MTN, Telecel
-  /// and AT, so no single mark is correct).
+  /// Logo tile under `assets/images/billers/`, or null where the biller is
+  /// an aggregate of several networks (airtime and data before a network is
+  /// known, when no single mark is correct).
   final String? asset;
 
   static const _ecgAmber = Color(0xFFF5A623);
   static const _waterBlue = Color(0xFF0B7BC1);
-  static const _dstvBlue = Color(0xFF0B4EA2);
-  static const _gotvGreen = Color(0xFF00A14B);
+  static const _dstvBlue = Color(0xFF00508F);
+  static const _gotvGreen = Color(0xFF018A3A);
   static const _starOrange = Color(0xFFE8500E);
   static const _mtnYellow = Color(0xFFFFCB05);
-  static const _fibreViolet = Color(0xFF6C4BC1);
+  static const _telecelRed = Color(0xFFE42528);
+  static const _atNavy = Color(0xFF223D76);
+  static const _neutralNavy = Color(0xFF13294B);
 
   static const Map<UtilityType, BillerBrand> _brands = {
     UtilityType.ecg: BillerBrand(
@@ -55,45 +58,70 @@ class BillerBrand {
       color: _waterBlue,
       onColor: Colors.white,
       tint: Color(0xFFE0EDF8),
-      asset: 'gwcl.png',
+      asset: 'gwcl.webp',
     ),
     UtilityType.dstv: BillerBrand(
       color: _dstvBlue,
       onColor: Colors.white,
       tint: Color(0xFFE2EAF7),
-      asset: 'dstv.png',
+      asset: 'dstv.webp',
     ),
     UtilityType.gotv: BillerBrand(
       color: _gotvGreen,
       onColor: Colors.white,
       tint: Color(0xFFDDF3E7),
-      asset: 'gotv.png',
+      asset: 'gotv.webp',
     ),
     UtilityType.startimes: BillerBrand(
       color: _starOrange,
       onColor: Colors.white,
       tint: Color(0xFFFCE6DC),
-      asset: 'startimes.png',
+      asset: 'startimes.webp',
     ),
-    // Airtime and data span MTN, Telecel and AT — no single mark applies,
-    // so these use the network-neutral yellow with the enum's own glyph.
-    UtilityType.airtime: BillerBrand(
-      color: _mtnYellow,
-      onColor: Color(0xFF3A2F00),
-      tint: Color(0xFFFFF6D6),
-    ),
-    UtilityType.dataBundle: BillerBrand(
-      color: _mtnYellow,
-      onColor: Color(0xFF3A2F00),
-      tint: Color(0xFFFFF6D6),
-    ),
-    UtilityType.internet: BillerBrand(
-      color: _fibreViolet,
-      onColor: Colors.white,
-      tint: Color(0xFFEBE5F8),
-      asset: 'surfline.png',
-    ),
+    // Airtime and data span MTN, Telecel and AT, so until the network is
+    // known they stay neutral rather than borrowing one network's colour.
+    UtilityType.airtime: _anyNetwork,
+    UtilityType.dataBundle: _anyNetwork,
+    UtilityType.internet: _telecel,
   };
+
+  static const _anyNetwork = BillerBrand(
+    color: _neutralNavy,
+    onColor: Colors.white,
+    tint: Color(0xFFE9EDF4),
+  );
+
+  static const _mtn = BillerBrand(
+    color: _mtnYellow,
+    onColor: Color(0xFF3A2F00),
+    tint: Color(0xFFFFF6D6),
+    asset: 'mtn.webp',
+  );
+
+  static const _telecel = BillerBrand(
+    color: _telecelRed,
+    onColor: Colors.white,
+    tint: Color(0xFFFCE4E4),
+    asset: 'telecel.webp',
+  );
+
+  static const _at = BillerBrand(
+    color: _atNavy,
+    onColor: Colors.white,
+    tint: Color(0xFFE4E9F3),
+    asset: 'at.webp',
+  );
+
+  static BillerBrand ofNetwork(MobileNetwork network) => switch (network) {
+    MobileNetwork.mtn => _mtn,
+    MobileNetwork.telecel => _telecel,
+    MobileNetwork.airtelTigo => _at,
+  };
+
+  /// The network's brand for airtime and data once it's known, otherwise the
+  /// utility's own.
+  static BillerBrand resolve(UtilityType type, MobileNetwork? network) =>
+      type.isPhoneAccount && network != null ? ofNetwork(network) : of(type);
 
   static BillerBrand of(UtilityType type) => _brands[type]!;
 
