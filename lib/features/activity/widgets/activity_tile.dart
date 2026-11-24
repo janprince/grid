@@ -1,105 +1,83 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/models.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/widgets.dart';
 
-/// One row of history: a payment or a service request.
+/// One row of history: a payment or a service request, as a [HistoryRow].
 ///
-/// No longer a card. A screen of identical white rounded cards is the single
-/// biggest reason the app read as templated — history is a list, and lists
-/// are flat. Rhythm comes from the biller's own mark on the left and from
-/// the date headers the screen puts between groups.
+/// The biller's own mark (or the service's art) carries the row; the words
+/// say what it was and when, and the right side says how much and how it
+/// ended, in plain words rather than a pill.
 class ActivityTile extends StatelessWidget {
-  const ActivityTile({super.key, required this.item, required this.onTap});
+  const ActivityTile({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.timeOnly = false,
+    this.divider = true,
+  });
 
   final ActivityItem item;
   final VoidCallback onTap;
 
+  /// Under a date header the day is already said; show the time instead.
+  final bool timeOnly;
+  final bool divider;
+
+  /// Whose account it was. A payment saved under no nickname falls back to
+  /// its type's name, which the title already says; show the number then.
+  String _who() {
+    final tx = item.transaction;
+    if (tx != null &&
+        (item.subtitle.isEmpty || item.subtitle == tx.type.label)) {
+      return tx.type.isPhoneAccount
+          ? Fmt.ghanaPhone(tx.accountNumber)
+          : Fmt.masked(tx.accountNumber);
+    }
+    return item.subtitle;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Use the typed constructors rather than matching on the display
-    // string, which silently fell through to "info" for any new status.
-    final badge = switch (item) {
-      ActivityItem(transaction: final tx?) => StatusBadge.transaction(
-        tx.status,
+    final when = timeOnly ? Fmt.time(item.date) : Fmt.relativeDay(item.date);
+    final (status, tone) = switch (item) {
+      ActivityItem(transaction: final tx?) => switch (tx.status) {
+        TransactionStatus.success => ('Completed', HistoryTone.quiet),
+        TransactionStatus.pending => ('Pending', HistoryTone.waiting),
+        TransactionStatus.failed => ('Failed', HistoryTone.problem),
+      },
+      ActivityItem(request: final req?) => (
+        req.status.label,
+        switch (req.status) {
+          ServiceRequestStatus.awaitingPayment ||
+          ServiceRequestStatus.searching => HistoryTone.waiting,
+          ServiceRequestStatus.assigned ||
+          ServiceRequestStatus.inProgress => HistoryTone.active,
+          ServiceRequestStatus.paymentFailed => HistoryTone.problem,
+          _ => HistoryTone.quiet,
+        },
       ),
-      ActivityItem(request: final req?) => StatusBadge.request(req.status),
-      _ => StatusBadge(label: item.statusLabel, tone: BadgeTone.info),
+      _ => (item.statusLabel, HistoryTone.quiet),
     };
 
-    final subtitleParts = [
-      item.subtitle,
-      if (item.propertyLabel != null) item.propertyLabel!,
-    ];
-
-    return InkWell(
+    return HistoryRow(
+      leading: item.utilityType != null
+          ? BillerMark(
+              item.utilityType!,
+              size: 48,
+              network: item.transaction?.network,
+            )
+          : item.request != null
+          ? ServiceBadge(slug: item.request!.serviceSlug, size: 48)
+          : HistoryIcon(item.icon),
+      title: item.title,
+      subtitle: '${_who()} · $when',
+      value: item.amount == null ? null : Fmt.cedis(item.amount!),
+      status: status,
+      tone: tone,
       onTap: onTap,
-      borderRadius: Corners.rowRadius,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Insets.sm,
-          vertical: Insets.md,
-        ),
-        child: Row(
-          children: [
-            if (item.utilityType != null)
-              BillerMark(item.utilityType!, network: item.transaction?.network)
-            else if (item.request != null)
-              ServiceBadge(category: item.request!.category)
-            else
-              TintedIcon(item.icon),
-            Gaps.md,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: theme.textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitleParts.join(' · '),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.muted,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Gaps.sm,
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (item.amount != null)
-                  Text(
-                    Fmt.cedis(item.amount!),
-                    style: theme.textTheme.titleMedium?.tabular,
-                  )
-                else
-                  Text(
-                    Fmt.time(item.date),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.faint,
-                    ),
-                  ),
-                const SizedBox(height: 6),
-                badge,
-              ],
-            ),
-          ],
-        ),
-      ),
+      divider: divider,
     );
   }
 }

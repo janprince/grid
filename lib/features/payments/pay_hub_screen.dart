@@ -10,6 +10,9 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/widgets.dart';
+import 'pay_groups.dart';
+import 'widgets/pay_flow_parts.dart';
+import 'widgets/pay_help_sheet.dart';
 import 'widgets/transaction_receipt_sheet.dart';
 
 class PayHubScreen extends ConsumerWidget {
@@ -26,7 +29,16 @@ class PayHubScreen extends ConsumerWidget {
         .toList();
 
     return Scaffold(
-      appBar: const AppHeader(title: 'Pay bills'),
+      appBar: AppHeader(
+        title: 'Pay bills',
+        trailing: NavChip(
+          onPressed: () => showPayHelpSheet(context),
+          icon: Icons.question_mark_rounded,
+          tooltip: 'Help',
+          color: AppColors.navySoft,
+          iconColor: AppColors.navy,
+        ),
+      ),
       body: SafeArea(
         top: false,
         child: CustomScrollView(
@@ -53,17 +65,30 @@ class PayHubScreen extends ConsumerWidget {
                 ),
               ),
             ],
-            const SliverToBoxAdapter(child: SectionHeader(title: 'Utilities')),
-            // Rows, not a 2-column grid. Eight tiles that differed only by
-            // glyph colour were unscannable; a list lets each biller's own
-            // mark carry the row.
+            const SliverToBoxAdapter(
+              child: SectionHeader(title: 'What are you paying for?'),
+            ),
+            // Two to a row, each biller's own logo large on a white card, so
+            // the page is scanned by brand. TV, airtime and data open a
+            // choice of provider rather than crowding this page with eight.
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: Insets.md),
-              sliver: SliverList.builder(
-                itemCount: UtilityType.values.length,
-                itemBuilder: (context, i) => _UtilityRow(
-                  type: UtilityType.values[i],
-                  accounts: accounts,
+              padding: const EdgeInsets.fromLTRB(
+                Insets.xl,
+                Insets.xs,
+                Insets.xl,
+                Insets.sm,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: ProviderGrid(
+                  children: [
+                    for (final group in PayGroup.values)
+                      ProviderTile(
+                        label: group.label,
+                        caption: _caption(group, accounts),
+                        mark: group.mark(),
+                        onTap: () => context.push(group.route),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -77,15 +102,17 @@ class PayHubScreen extends ConsumerWidget {
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
-                  Insets.md,
+                  Insets.xl,
                   0,
-                  Insets.md,
+                  Insets.xl,
                   Insets.xxxl,
                 ),
                 sliver: SliverList.builder(
                   itemCount: recentPayments.length,
-                  itemBuilder: (context, i) =>
-                      _RecentPaymentTile(tx: recentPayments[i]),
+                  itemBuilder: (context, i) => _RecentPaymentTile(
+                    tx: recentPayments[i],
+                    divider: i != recentPayments.length - 1,
+                  ),
                 ),
               ),
             ] else
@@ -94,6 +121,12 @@ class PayHubScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// "2 saved" once there are saved accounts, otherwise what it covers.
+  static String _caption(PayGroup group, List<UtilityAccount> accounts) {
+    final saved = accounts.where((a) => group.types.contains(a.type)).length;
+    return saved > 0 ? '$saved saved' : group.caption;
   }
 
   /// Default/most relevant account per type, due-soon first.
@@ -178,129 +211,65 @@ class _SavedAccountCard extends StatelessWidget {
   }
 }
 
-class _UtilityRow extends StatelessWidget {
-  const _UtilityRow({required this.type, required this.accounts});
-
-  final UtilityType type;
-  final List<UtilityAccount> accounts;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final saved = accounts.where((a) => a.type == type).length;
-
-    return InkWell(
-      onTap: () => context.push(Routes.payFlow(type.name)),
-      borderRadius: Corners.rowRadius,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Insets.sm,
-          vertical: Insets.md,
-        ),
-        child: Row(
-          children: [
-            BillerMark(type),
-            Gaps.md,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    type.label,
-                    style: theme.textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    saved > 0
-                        ? '$saved saved account${saved == 1 ? '' : 's'}'
-                        : type.tagline,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.faint,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.faint,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _RecentPaymentTile extends ConsumerWidget {
-  const _RecentPaymentTile({required this.tx});
+  const _RecentPaymentTile({required this.tx, required this.divider});
 
   final PaymentTransaction tx;
+  final bool divider;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => showTransactionSheet(context, tx),
-      borderRadius: Corners.rowRadius,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Insets.sm,
-          vertical: Insets.md,
-        ),
-        child: Row(
-          children: [
-            BillerMark(tx.type, network: tx.network),
-            Gaps.md,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tx.accountNickname,
-                    style: theme.textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${Fmt.cedis(tx.amount)} · '
-                    '${Fmt.relativeDay(tx.createdAt)}',
-                    style: theme.textTheme.bodySmall?.tabular.copyWith(
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Gaps.sm,
-            SecondaryButton(
-              label: 'Pay again',
-              onPressed: () {
-                final account = ref
-                    .read(accountsProvider)
-                    .where(
-                      (a) =>
-                          a.type == tx.type &&
-                          a.accountNumber == tx.accountNumber,
-                    )
-                    .firstOrNull;
-                context.push(
-                  account == null
-                      ? Routes.payFlow(tx.type.name)
-                      : '${Routes.payFlow(tx.type.name)}?account=${account.id}',
-                );
-              },
-              expand: false,
-            ),
-          ],
-        ),
-      ),
+  void _payAgain(BuildContext context, WidgetRef ref) {
+    final account = ref
+        .read(accountsProvider)
+        .where((a) => a.type == tx.type && a.accountNumber == tx.accountNumber)
+        .firstOrNull;
+    context.push(
+      account == null
+          ? Routes.payFlow(tx.type.name)
+          : '${Routes.payFlow(tx.type.name)}?account=${account.id}',
     );
   }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => HistoryRow(
+    leading: BillerMark(tx.type, size: 48, network: tx.network),
+    // Unnamed payments carry their type as the nickname; the number is
+    // what tells two of them apart.
+    title: tx.accountNickname == tx.type.label
+        ? (tx.type.isPhoneAccount
+              ? Fmt.ghanaPhone(tx.accountNumber)
+              : tx.accountNumber)
+        : tx.accountNickname,
+    subtitle: '${tx.type.label} · ${Fmt.relativeDay(tx.createdAt)}',
+    onTap: () => showTransactionSheet(context, tx),
+    divider: divider,
+    trailing: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          Fmt.cedis(tx.amount),
+          style: AppText.heading.copyWith(
+            fontSize: 16,
+            fontFeatures: AppText.tabularFigures,
+          ),
+        ),
+        InkWell(
+          onTap: () => _payAgain(context, ref),
+          borderRadius: Corners.smRadius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              'Pay again',
+              style: AppText.body.copyWith(
+                fontSize: 14,
+                height: 1.2,
+                color: AppColors.navy,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

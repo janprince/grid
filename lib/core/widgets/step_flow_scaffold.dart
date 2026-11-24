@@ -85,9 +85,14 @@ class StepFlowScaffold extends StatelessWidget {
           ),
         ),
         body: child,
+        // The bar rides above the keyboard, so the next step is always one
+        // tap away while typing.
         bottomNavigationBar: bottomBar == null
             ? null
             : Container(
+                margin: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom,
+                ),
                 decoration: const BoxDecoration(
                   color: AppColors.surface,
                   border: Border(

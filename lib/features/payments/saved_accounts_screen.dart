@@ -68,10 +68,11 @@ class SavedAccountsScreen extends ConsumerWidget {
                       ).textTheme.labelMedium?.copyWith(color: AppColors.faint),
                     ),
                   ),
-                  for (final account in entry.value) ...[
-                    _AccountCard(account: account),
-                    Gaps.md,
-                  ],
+                  for (final account in entry.value)
+                    _AccountCard(
+                      account: account,
+                      divider: account != entry.value.last,
+                    ),
                 ],
               ],
             ),
@@ -80,82 +81,29 @@ class SavedAccountsScreen extends ConsumerWidget {
 }
 
 class _AccountCard extends ConsumerWidget {
-  const _AccountCard({required this.account});
+  const _AccountCard({required this.account, required this.divider});
 
   final UtilityAccount account;
+  final bool divider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final property = ref.watch(propertyByIdProvider(account.propertyId));
-
-    return AppCard(
-      padding: const EdgeInsets.all(Insets.lg),
+    final number = account.type.isPhoneAccount
+        ? Fmt.ghanaPhone(account.accountNumber)
+        : account.accountNumber;
+    return HistoryRow(
+      leading: BillerMark(account.type, size: 48, network: account.network),
+      title: account.nickname,
+      subtitle: [number, ?property?.nickname].join(' · '),
+      status: account.isDefault
+          ? 'Default'
+          : account.lastPaidAt == null
+          ? null
+          : Fmt.lastPaidLabel(account.lastPaidAt!),
+      tone: account.isDefault ? HistoryTone.active : HistoryTone.quiet,
       onTap: () => showAccountFormSheet(context, existing: account),
-      child: Row(
-        children: [
-          BillerMark(account.type, network: account.network),
-          Gaps.md,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        account.nickname,
-                        style: theme.textTheme.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (account.isDefault) ...[
-                      Gaps.sm,
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 16,
-                        color: AppColors.warning,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  account.accountNumber,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                  ),
-                ),
-                if (property != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${property.nickname} • ${property.location}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppColors.faint,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Gaps.sm,
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (account.lastPaidAt != null)
-                Text(
-                  Fmt.lastPaidLabel(account.lastPaidAt!),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.faint,
-                  ),
-                ),
-              const SizedBox(height: 4),
-              const Icon(Icons.edit_outlined, size: 18, color: AppColors.faint),
-            ],
-          ),
-        ],
-      ),
+      divider: divider,
     );
   }
 }

@@ -81,20 +81,6 @@ class ProfileScreen extends ConsumerWidget {
                           label: 'Notifications',
                           onTap: () => context.push(Routes.notifications),
                         ),
-                        MenuRow(
-                          icon: Icons.group_add_outlined,
-                          label: 'Invite family',
-                          value: 'Soon',
-                          onTap: () =>
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Family & shared-home access arrives in '
-                                    'a later release',
-                                  ),
-                                ),
-                              ),
-                        ),
                       ],
                     ),
                     const SectionHeader(

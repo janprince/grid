@@ -10,14 +10,17 @@ import '../../features/home/dashboard_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/onboarding/splash_screen.dart';
 import '../../features/payments/payment_flow_screen.dart';
+import '../../features/payments/pay_groups.dart';
 import '../../features/payments/pay_hub_screen.dart';
+import '../../features/payments/pay_provider_screen.dart';
 import '../../features/payments/saved_accounts_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/settings_screens.dart';
 import '../../features/properties/add_edit_property_screen.dart';
 import '../../features/properties/property_details_screen.dart';
 import '../../features/properties/properties_screen.dart';
-import '../../features/services/booking_coming_soon_screen.dart';
+import '../../features/services/service_screen.dart';
+import '../../features/services/booking_flow_screen.dart';
 import '../../features/services/request_details_screen.dart';
 import '../../features/services/services_hub_screen.dart';
 import '../models/models.dart';
@@ -109,7 +112,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.services,
-                builder: (context, state) => const ServicesHubScreen(),
+                builder: (context, state) => ServicesHubScreen(
+                  focusSearch: state.uri.queryParameters['search'] == '1',
+                ),
               ),
             ],
           ),
@@ -133,8 +138,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Full-screen flows presented over the shell (no bottom nav).
       GoRoute(
+        path: '/pay/choose/:group',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => PayProviderScreen(
+          group:
+              PayGroup.values.asNameMap()[state.pathParameters['group']] ??
+              PayGroup.tv,
+        ),
+      ),
+      GoRoute(
         path: '/pay/flow/:type',
         parentNavigatorKey: _rootNavigatorKey,
+        // Airtime and data start by picking the network, unless a saved
+        // number (which knows its network) was chosen.
+        redirect: (context, state) {
+          final type = UtilityType.values
+              .asNameMap()[state.pathParameters['type']];
+          final query = state.uri.queryParameters;
+          if (type == null ||
+              !type.isPhoneAccount ||
+              query.containsKey('network') ||
+              query.containsKey('account')) {
+            return null;
+          }
+          return Routes.payChoose(PayGroup.of(type)!.name);
+        },
         builder: (context, state) {
           final type =
               UtilityType.values.asNameMap()[state.pathParameters['type']] ??
@@ -142,6 +170,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return PaymentFlowScreen(
             type: type,
             initialAccountId: state.uri.queryParameters['account'],
+            network: MobileNetwork.values
+                .asNameMap()[state.uri.queryParameters['network']],
           );
         },
       ),
@@ -150,16 +180,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SavedAccountsScreen(),
       ),
-      GoRoute(
-        path: Routes.bookService,
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const BookingComingSoonScreen(),
-      ),
+      // The request route comes first so "request" is never read as a service slug.
       GoRoute(
         path: '/services/request/:id',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) =>
             RequestDetailsScreen(requestId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/services/:slug',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) =>
+            ServiceScreen(slug: state.pathParameters['slug']!),
+      ),
+      GoRoute(
+        path: '/services/:slug/book',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          return BookingFlowScreen(
+            slug: state.pathParameters['slug']!,
+            args: extra is BookingArgs ? extra : null,
+          );
+        },
       ),
       GoRoute(
         path: Routes.properties,

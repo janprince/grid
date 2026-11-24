@@ -77,19 +77,26 @@ abstract final class AppColors {
 
   static const List<BoxShadow> flatShadow = [];
 
-  static List<BoxShadow> get raisedShadow => [
+  /// Elevation is a soft, wide shadow rather than an outline: a surface
+  /// reads as lifted off the page, not boxed in.
+  static const List<BoxShadow> raisedShadow = [
     BoxShadow(
-      color: navyDeep.withValues(alpha: 0.06),
-      blurRadius: 20,
-      offset: const Offset(0, 4),
+      color: Color(0x140B1526),
+      blurRadius: 24,
+      offset: Offset(0, 8),
+      spreadRadius: -6,
     ),
+    BoxShadow(color: Color(0x0F0B1526), blurRadius: 3, offset: Offset(0, 1)),
   ];
 
-  static List<BoxShadow> get liftedShadow => [
+  /// Things that float over scrolling content, and the one hero on a screen.
+  static const List<BoxShadow> liftedShadow = [
     BoxShadow(
-      color: navyDeep.withValues(alpha: 0.12),
-      blurRadius: 30,
-      offset: const Offset(0, 10),
+      color: Color(0x240B1526),
+      blurRadius: 32,
+      offset: Offset(0, 10),
+      spreadRadius: -4,
     ),
+    BoxShadow(color: Color(0x140B1526), blurRadius: 4, offset: Offset(0, 1)),
   ];
 }

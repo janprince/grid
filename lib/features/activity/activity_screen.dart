@@ -149,7 +149,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
             'Book a clean or a laundry pickup and track every job '
             'here.',
         actionLabel: 'Book a service',
-        onAction: () => context.push(Routes.bookService),
+        onAction: () => context.go(Routes.services),
       ),
       _Filter.all => EmptyState(
         icon: Icons.history_rounded,
@@ -190,17 +190,17 @@ class _GroupedActivityList extends StatelessWidget {
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(Insets.md, 0, Insets.md, Insets.xxxl),
+      padding: const EdgeInsets.fromLTRB(Insets.xl, 0, Insets.xl, Insets.xxxl),
       itemCount: entries.length,
       itemBuilder: (context, i) {
         final (header, item) = entries[i];
         if (header != null) {
           return Padding(
             padding: EdgeInsets.fromLTRB(
-              Insets.sm,
-              i == 0 ? Insets.sm : Insets.xl,
-              Insets.sm,
-              Insets.sm,
+              0,
+              i == 0 ? Insets.sm : Insets.xxl,
+              0,
+              0,
             ),
             child: Text(
               header,
@@ -211,8 +211,13 @@ class _GroupedActivityList extends StatelessWidget {
             ),
           );
         }
+        // The last row before the next day's header needs no rule.
+        final lastInGroup =
+            i == entries.length - 1 || entries[i + 1].$1 != null;
         return ActivityTile(
           item: item!,
+          timeOnly: true,
+          divider: !lastInGroup,
           onTap: () {
             if (item.transaction != null) {
               showTransactionSheet(context, item.transaction!);

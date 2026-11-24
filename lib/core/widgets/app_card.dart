@@ -4,17 +4,12 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
 /// Where a surface sits relative to the page.
-///
-/// The redesign's central rule: **at most one `raised` or `lifted` surface
-/// per viewport.** Previously every card carried the same shadow, so a
-/// screen of ten cards had ten things competing to float and the eye had
-/// nowhere to land.
 enum AppCardVariant {
-  /// The default. A hairline outline and no shadow — for list rows and
-  /// grouped blocks, which is most content.
+  /// A hairline outline and no shadow. For cards on a tinted or grey ground,
+  /// where a shadow would look dirty, and for dense lists.
   flat,
 
-  /// For a surface that genuinely floats above the page.
+  /// The default: a soft shadow lifts the card off the page.
   raised,
 
   /// Reserved for the single hero element on a screen.
@@ -31,7 +26,7 @@ class AppCard extends StatelessWidget {
     this.color = AppColors.surface,
     this.borderRadius = Corners.lgRadius,
     this.border,
-    this.variant = AppCardVariant.flat,
+    this.variant = AppCardVariant.raised,
   });
 
   final Widget child;

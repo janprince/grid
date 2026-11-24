@@ -203,6 +203,7 @@ class PropertyDetailsScreen extends ConsumerWidget {
             for (final item in activity) ...[
               ActivityTile(
                 item: item,
+                divider: item != activity.last,
                 onTap: () {
                   if (item.transaction != null) {
                     showTransactionSheet(context, item.transaction!);
@@ -211,7 +212,6 @@ class PropertyDetailsScreen extends ConsumerWidget {
                   }
                 },
               ),
-              Gaps.md,
             ],
           Gaps.xxl,
         ],

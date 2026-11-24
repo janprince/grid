@@ -274,8 +274,20 @@ class FakeBillPaymentsApi implements BillPaymentsApi {
       customerName: type.isPhoneAccount ? '' : 'Test Customer',
       nameConfirmed: !type.isPhoneAccount,
       bundles: [
-        if (type == UtilityType.dataBundle)
-          const BillBundle(value: 'bundle-1', label: '1 GB', amount: 10),
+        if (type == UtilityType.dataBundle) ...const [
+          BillBundle(value: 'bundle-1', label: '1 GB', amount: 10),
+          BillBundle(
+            value: 'DATANVSTRDLY',
+            label: 'No Expiry - 22.29MB (GHs 0.5) · DATANVSTRDLY',
+            amount: 0.5,
+          ),
+          BillBundle(value: 'b2', label: 'No expiry · 406.89MB', amount: 3),
+          BillBundle(value: 'b3', label: 'No expiry · 2.78GB', amount: 40),
+          BillBundle(value: 'b4', label: 'Daily · 120MB', amount: 1.5),
+          BillBundle(value: 'b5', label: 'Weekly · 1.5GB', amount: 15),
+          BillBundle(value: 'b6', label: 'Monthly · 6GB', amount: 50),
+          BillBundle(value: 'b7', label: 'Night · 460MB', amount: 1.2),
+        ],
       ],
       fixedPrice: type.isPlanBased,
       minAmount: type.isPlanBased ? null : 1,
@@ -357,4 +369,207 @@ class FakeBillPaymentsApi implements BillPaymentsApi {
   Future<List<BillOrder>> history() async =>
       _orders.values.toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+}
+
+/// The launch catalogue in miniature: enough to render every service screen.
+const fakeCatalogue = ServiceCatalogue(
+  sections: [
+    ServiceSection(
+      name: 'Cleaning & laundry',
+      services: [
+        ServiceItem(
+          id: 'svc-cleaning',
+          slug: 'cleaning',
+          name: 'Home cleaning',
+          description:
+              'Homes and apartments: regular, deep and move-out cleans.',
+          section: 'Cleaning & laundry',
+          fromPrice: 180,
+          packages: [
+            ServicePackage(
+              id: 'p-std-1',
+              slug: 'cleaning-standard-1-bed',
+              group: 'Standard clean',
+              name: '1 bedroom',
+              price: 180,
+              durationMinutes: 120,
+              includes: ['Floors swept and mopped'],
+            ),
+            ServicePackage(
+              id: 'p-std-2',
+              slug: 'cleaning-standard-2-bed',
+              group: 'Standard clean',
+              name: '2 bedrooms',
+              price: 250,
+              durationMinutes: 180,
+            ),
+            ServicePackage(
+              id: 'p-sofa',
+              slug: 'cleaning-sofa-seat',
+              group: 'Sofa cleaning',
+              name: 'Sofa cleaning',
+              price: 60,
+              unitLabel: 'seat',
+              maxQuantity: 12,
+            ),
+          ],
+        ),
+        ServiceItem(
+          id: 'svc-laundry',
+          slug: 'laundry',
+          name: 'Laundry',
+          description: 'Wash, iron and dry cleaning, with pickup and delivery.',
+          section: 'Cleaning & laundry',
+          fromPrice: 50,
+          packages: [
+            ServicePackage(
+              id: 'p-fold',
+              slug: 'laundry-wash-fold',
+              group: 'Wash & fold',
+              name: 'Wash & fold',
+              price: 60,
+              unitLabel: 'bag',
+              maxQuantity: 10,
+            ),
+          ],
+        ),
+      ],
+    ),
+    ServiceSection(
+      name: 'Repairs & maintenance',
+      services: [
+        ServiceItem(
+          id: 'svc-ac',
+          slug: 'ac-servicing',
+          name: 'AC servicing',
+          description:
+              'Split and window units: servicing, deep cleans and gas.',
+          section: 'Repairs & maintenance',
+          fromPrice: 150,
+          packages: [
+            ServicePackage(
+              id: 'p-ac',
+              slug: 'ac-servicing-general-service',
+              group: 'General service',
+              name: 'General service',
+              price: 250,
+              unitLabel: 'unit',
+              maxQuantity: 6,
+            ),
+          ],
+        ),
+        ServiceItem(
+          id: 'svc-pest',
+          slug: 'pest-control',
+          name: 'Pest control',
+          description: 'Fumigation for mosquitoes, cockroaches and rodents.',
+          section: 'Repairs & maintenance',
+          fromPrice: 200,
+          packages: [
+            ServicePackage(
+              id: 'p-fum',
+              slug: 'pest-control-fumigation-small',
+              group: 'General fumigation',
+              name: 'Studio to 2 bedrooms',
+              price: 400,
+            ),
+          ],
+        ),
+      ],
+    ),
+  ],
+);
+
+/// Books instantly and reports the payment as approved, so flows reach the
+/// booking page without a phone.
+class FakeServicesApi implements ServicesApi {
+  final List<ServiceRequest> _requests = [];
+
+  @override
+  Future<ServiceCatalogue> catalogue() async => fakeCatalogue;
+
+  @override
+  Future<ServiceAvailability> availability({
+    required String serviceId,
+    required String propertyId,
+    required DateTime date,
+  }) async => ServiceAvailability(
+    served: true,
+    area: 'East Legon',
+    providersNearby: 2,
+    slots: [
+      for (var hour = 8; hour <= 16; hour += 2)
+        ServiceSlot(
+          startsAt: DateTime(date.year, date.month, date.day, hour),
+          available: true,
+        ),
+    ],
+  );
+
+  @override
+  Future<ServiceRequest> book({
+    required List<BookingLine> lines,
+    required String propertyId,
+    required DateTime scheduledAt,
+    required String idempotencyKey,
+    String? notes,
+    List<String> items = const [],
+    String? preferredProviderId,
+  }) async {
+    final total = lines.fold<double>(0, (sum, l) => sum + l.total);
+    final request = ServiceRequest(
+      id: 'req-${_requests.length + 1}',
+      reference: 'GR-${1001 + _requests.length}',
+      serviceSlug: 'cleaning',
+      serviceName: 'Home cleaning',
+      title: lines.first.package.label,
+      lines: [
+        for (final l in lines)
+          RequestLine(
+            packageId: l.package.id,
+            name: l.package.label,
+            unitPrice: l.package.price,
+            quantity: l.quantity,
+            total: l.total,
+          ),
+      ],
+      total: total,
+      area: 'East Legon',
+      address: '12 Lagos Avenue',
+      scheduledAt: scheduledAt,
+      status: ServiceRequestStatus.searching,
+      createdAt: DateTime.now(),
+      payment: ServicePaymentInfo(
+        status: ServicePaymentStatus.paid,
+        amount: total,
+        payerPhone: '233551234567',
+      ),
+      canCancel: true,
+    );
+    _requests.insert(0, request);
+    return request;
+  }
+
+  @override
+  Future<List<ServiceRequest>> requests() async => List.of(_requests);
+
+  @override
+  Future<ServiceRequest> request(String id) async =>
+      _requests.firstWhere((r) => r.id == id);
+
+  @override
+  Future<ServiceRequest> pay(String id) => request(id);
+
+  @override
+  Future<ServiceRequest> cancel(String id, {String? reason}) => request(id);
+
+  @override
+  Future<ServiceRequest> confirmCompletion(String id) => request(id);
+
+  @override
+  Future<ServiceRequest> review(
+    String id, {
+    required int rating,
+    String? comment,
+  }) => request(id);
 }

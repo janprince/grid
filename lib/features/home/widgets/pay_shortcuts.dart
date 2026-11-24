@@ -6,6 +6,7 @@ import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../payments/pay_groups.dart';
 
 /// The fast repeat tasks people open GRID for.
 ///
@@ -38,7 +39,10 @@ class PayShortcuts extends StatelessWidget {
           final type = _billers[i];
           return _Shortcut(
             label: type.shortLabel,
-            onTap: () => context.push(Routes.payFlow(type.name)),
+            // TV, airtime and data first ask which provider.
+            onTap: () => context.push(
+              PayGroup.of(type)?.route ?? Routes.payFlow(type.name),
+            ),
             child: BillerMark(type, size: 52),
           );
         },

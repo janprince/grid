@@ -6,6 +6,7 @@ import '../models/utility_type.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/biller_brand.dart';
+import 'phone_service_mark.dart';
 
 /// A biller's identity: its logo as a full rounded tile.
 ///
@@ -21,11 +22,17 @@ class BillerMark extends StatelessWidget {
   final MobileNetwork? network;
 
   @override
-  Widget build(BuildContext context) => _MarkTile(
-    brand: BillerBrand.resolve(type, network),
-    glyph: type.icon,
-    size: size,
-  );
+  Widget build(BuildContext context) {
+    // No network yet: GRID's own airtime or data tile.
+    if (type.isPhoneAccount && network == null) {
+      return PhoneServiceMark(type, size: size);
+    }
+    return _MarkTile(
+      brand: BillerBrand.resolve(type, network),
+      glyph: type.icon,
+      size: size,
+    );
+  }
 }
 
 /// A mobile network's logo, for wallets and network choices.
