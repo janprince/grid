@@ -6,8 +6,6 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/models/models.dart';
-import '../../core/theme/service_art.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/widgets.dart';
 
@@ -28,9 +26,9 @@ const _pages = [
   ),
   _OnboardPage(
     Icons.cleaning_services_rounded,
-    'Book cleaning and laundry',
-    'Vetted cleaners and laundries near you. You pay once the job is '
-        'done.',
+    'Book trusted home services',
+    'Cleaning, laundry, plumbing and AC servicing from vetted '
+        'professionals. You pay once the job is done.',
   ),
   _OnboardPage(
     Icons.other_houses_rounded,
@@ -189,32 +187,7 @@ class _PageArt extends StatelessWidget {
               ],
             ),
           ),
-          1 => Row(
-            children: [
-              for (final category in ServiceCategory.values) ...[
-                Expanded(
-                  child: TintCard(
-                    tint: category.tint,
-                    arc: category.arc,
-                    padding: const EdgeInsets.all(Insets.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ServiceBadge(category: category, size: 40),
-                        Gaps.xl,
-                        Text(
-                          category.label,
-                          maxLines: 2,
-                          style: AppText.subtitle,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (category != ServiceCategory.values.last) Gaps.md,
-              ],
-            ],
-          ),
+          1 => const _ServiceMosaic(),
           _ => const DetailGroup(
             rows: [
               DetailRow(label: 'My Home', value: 'ECG · Water · DStv'),
@@ -226,4 +199,39 @@ class _PageArt extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The four services as a two-by-two block of pictures.
+class _ServiceMosaic extends StatelessWidget {
+  const _ServiceMosaic();
+
+  @override
+  Widget build(BuildContext context) {
+    const services = ['cleaning', 'laundry', 'ac-servicing', 'pest-control'];
+    Widget cell(String slug) => Expanded(
+      child: AspectRatio(
+        aspectRatio: 1.6,
+        child: ServiceArt(slug: slug, radius: 14),
+      ),
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < services.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 10),
+          Row(
+            children: [
+              cell(services[i]),
+              const SizedBox(width: 10),
+              if (i + 1 < services.length)
+                cell(services[i + 1])
+              else
+                const Spacer(),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
 }

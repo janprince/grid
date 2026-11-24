@@ -83,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const ScreenIntro(
                       title: 'Welcome to GRID',
                       subtitle:
-                          'Pay bills and book cleaning or laundry — all in '
+                          'Pay bills and book trusted home services — all in '
                           'one place.',
                     ),
                     Gaps.xxl,

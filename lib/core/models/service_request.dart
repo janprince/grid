@@ -1,150 +1,226 @@
-import 'service_category.dart';
+import 'service_catalogue.dart';
 
-enum ServiceUrgency {
-  standard(
-    label: 'Scheduled',
-    description: 'On the day and time you pick',
-    surcharge: 0,
-  ),
-  sameDay(
-    label: 'Same day',
-    description: 'Today, if a professional is free',
-    surcharge: 30,
-  );
+enum ServiceUrgency { standard, sameDay }
 
-  const ServiceUrgency({
-    required this.label,
-    required this.description,
-    required this.surcharge,
+/// Where a booking is, as GRID reports it.
+enum ServiceRequestStatus {
+  awaitingPayment(label: 'Awaiting payment'),
+  paymentFailed(label: 'Payment failed'),
+  searching(label: 'Finding a professional'),
+  assigned(label: 'Confirmed'),
+  inProgress(label: 'In progress'),
+  completed(label: 'Completed'),
+  cancelled(label: 'Cancelled'),
+  unfilled(label: 'No one available');
+
+  const ServiceRequestStatus({required this.label});
+
+  final String label;
+
+  /// Still moving: worth checking on.
+  bool get isOpen =>
+      {awaitingPayment, searching, assigned, inProgress}.contains(this);
+}
+
+enum ServicePaymentStatus {
+  awaitingApproval,
+  paid,
+  failed,
+  refunding,
+  refunded,
+  refundFailed,
+}
+
+class ServicePaymentInfo {
+  const ServicePaymentInfo({
+    required this.status,
+    required this.amount,
+    required this.payerPhone,
+    this.channel = '',
+    this.error,
+    this.paidAt,
+    this.refundedAt,
   });
 
-  final String label;
-  final String description;
-  final double surcharge;
+  final ServicePaymentStatus status;
+  final double amount;
+  final String channel;
+  final String payerPhone;
+  final String? error;
+  final DateTime? paidAt;
+  final DateTime? refundedAt;
+
+  String get label => switch (status) {
+    ServicePaymentStatus.awaitingApproval => 'Waiting for approval',
+    ServicePaymentStatus.paid => 'Paid',
+    ServicePaymentStatus.failed => 'Not paid',
+    ServicePaymentStatus.refunding => 'Refund on its way',
+    ServicePaymentStatus.refunded => 'Refunded',
+    ServicePaymentStatus.refundFailed => 'Refund delayed',
+  };
 }
 
-enum ServiceRequestStatus {
-  pending(label: 'Pending', description: 'Finding you a professional'),
-  assigned(label: 'Assigned', description: 'A professional has been assigned'),
-  inProgress(label: 'In progress', description: 'Work is underway'),
-  completed(label: 'Completed', description: 'Job finished and verified'),
-  cancelled(label: 'Cancelled', description: 'This request was cancelled');
-
-  const ServiceRequestStatus({required this.label, required this.description});
-
-  final String label;
-  final String description;
-
-  bool get isOpen =>
-      this == ServiceRequestStatus.pending ||
-      this == ServiceRequestStatus.assigned ||
-      this == ServiceRequestStatus.inProgress;
-}
-
-class ServiceProviderSummary {
-  const ServiceProviderSummary({
+/// The professional GRID assigned, shared once they accept.
+class AssignedProvider {
+  const AssignedProvider({
     required this.id,
     required this.name,
-    required this.role,
-    required this.rating,
-    required this.reviews,
-    required this.yearsExperience,
+    required this.phone,
+    this.completedJobs = 0,
+    this.rating,
+    this.reviews = 0,
   });
 
   final String id;
   final String name;
-  final String role;
-  final double rating;
+  final String phone;
+  final int completedJobs;
+  final double? rating;
   final int reviews;
-  final int yearsExperience;
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
 
-class TimelineEvent {
-  const TimelineEvent({
-    required this.title,
-    required this.subtitle,
-    required this.time,
+class RequestLine {
+  const RequestLine({
+    required this.packageId,
+    required this.name,
+    required this.unitPrice,
+    required this.quantity,
+    required this.total,
+    this.unitLabel,
   });
 
-  final String title;
-  final String subtitle;
-  final DateTime time;
+  final String packageId;
+  final String name;
+  final String? unitLabel;
+  final double unitPrice;
+  final int quantity;
+  final double total;
 }
 
+class RequestReview {
+  const RequestReview({required this.rating, this.comment});
+  final int rating;
+  final String? comment;
+}
+
+/// A booking: what, where, when, what it cost, and who is coming.
 class ServiceRequest {
   const ServiceRequest({
     required this.id,
     required this.reference,
-    required this.category,
-    required this.issue,
-    required this.description,
-    required this.propertyId,
-    required this.propertyLabel,
-    required this.urgency,
-    required this.preferredDate,
-    required this.timeSlot,
+    required this.serviceSlug,
+    required this.serviceName,
+    required this.title,
+    required this.lines,
+    required this.total,
+    required this.area,
+    required this.address,
+    required this.scheduledAt,
     required this.status,
     required this.createdAt,
+    this.bookingMode = BookingMode.fixedPrice,
+    this.scope,
+    this.items = const [],
+    this.notes,
+    this.propertyId,
+    this.city = '',
+    this.payment,
+    this.jobCode,
+    this.jobStage,
     this.provider,
-    this.photoCount = 0,
-    this.estimateLow,
-    this.estimateHigh,
-    this.finalAmount,
-    this.timeline = const [],
+    this.review,
+    this.canCancel = false,
   });
 
   final String id;
+
+  /// "GR-1042".
   final String reference;
-  final ServiceCategory category;
-  final String issue;
-  final String description;
-  final String propertyId;
-  final String propertyLabel;
-  final ServiceUrgency urgency;
-  final DateTime preferredDate;
-  final String timeSlot;
+  final String serviceSlug;
+  final String serviceName;
+  final BookingMode bookingMode;
+  final String title;
+  final String? scope;
+  final List<RequestLine> lines;
+  final double total;
+  final List<String> items;
+  final String? notes;
+  final String? propertyId;
+  final String area;
+  final String city;
+  final String address;
+  final DateTime scheduledAt;
   final ServiceRequestStatus status;
+  final ServicePaymentInfo? payment;
+  final String? jobCode;
+
+  /// camelCase stage from GRID, e.g. `onTheWay`, `awaitingConfirmation`.
+  final String? jobStage;
+  final AssignedProvider? provider;
+  final RequestReview? review;
+  final bool canCancel;
   final DateTime createdAt;
-  final ServiceProviderSummary? provider;
-  final int photoCount;
-  final double? estimateLow;
-  final double? estimateHigh;
-  final double? finalAmount;
-  final List<TimelineEvent> timeline;
 
-  /// Starting price for this request, before the professional confirms.
-  double get estimate => category.fromPrice + urgency.surcharge;
+  bool get awaitingConfirmation => jobStage == 'awaitingConfirmation';
 
-  ServiceRequest copyWith({
-    ServiceRequestStatus? status,
-    ServiceProviderSummary? provider,
-    List<TimelineEvent>? timeline,
-    double? finalAmount,
-  }) => ServiceRequest(
-    id: id,
-    reference: reference,
-    category: category,
-    issue: issue,
-    description: description,
-    propertyId: propertyId,
-    propertyLabel: propertyLabel,
-    urgency: urgency,
-    preferredDate: preferredDate,
-    timeSlot: timeSlot,
-    status: status ?? this.status,
-    createdAt: createdAt,
-    provider: provider ?? this.provider,
-    photoCount: photoCount,
-    estimateLow: estimateLow,
-    estimateHigh: estimateHigh,
-    finalAmount: finalAmount ?? this.finalAmount,
-    timeline: timeline ?? this.timeline,
-  );
+  bool get awaitingApproval =>
+      status == ServiceRequestStatus.awaitingPayment &&
+      payment?.status == ServicePaymentStatus.awaitingApproval;
+
+  /// What the customer should read first, in plain words.
+  String get headline => switch (status) {
+    ServiceRequestStatus.awaitingPayment => 'Approve the payment on your phone',
+    ServiceRequestStatus.paymentFailed => 'Your payment didn\'t go through',
+    ServiceRequestStatus.searching => 'Finding you a professional',
+    ServiceRequestStatus.assigned =>
+      '${provider?.name ?? 'Your professional'} is booked',
+    ServiceRequestStatus.inProgress =>
+      awaitingConfirmation ? 'Is everything done?' : stageHeadline,
+    ServiceRequestStatus.completed => 'Done',
+    ServiceRequestStatus.cancelled => 'Booking cancelled',
+    ServiceRequestStatus.unfilled => 'No one was available',
+  };
+
+  String get stageHeadline => switch (jobStage) {
+    'onTheWay' => '${provider?.name ?? 'Your professional'} is on the way',
+    'arrived' => '${provider?.name ?? 'Your professional'} has arrived',
+    'inProgress' => 'Work in progress',
+    'pickedUp' => 'Your laundry has been collected',
+    'processing' => 'Washing',
+    'readyForDelivery' => 'Your laundry is ready',
+    'outForDelivery' => 'Your laundry is on its way back',
+    _ => 'In progress',
+  };
+}
+
+/// Hours someone nearby can come on one day.
+class ServiceSlot {
+  const ServiceSlot({required this.startsAt, required this.available});
+  final DateTime startsAt;
+  final bool available;
+}
+
+class ServiceAvailability {
+  const ServiceAvailability({
+    required this.served,
+    this.area,
+    this.providersNearby = 0,
+    this.slots = const [],
+  });
+
+  final bool served;
+  final String? area;
+  final int providersNearby;
+  final List<ServiceSlot> slots;
 }

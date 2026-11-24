@@ -105,30 +105,44 @@ class MeterSelectionRequired implements Exception {
 }
 
 abstract interface class ServicesApi {
-  Future<ServiceRequest> submitRequest({
-    required ServiceCategory category,
-    required String issue,
-    required String description,
-    required Property property,
-    required ServiceUrgency urgency,
-    required DateTime preferredDate,
-    required String timeSlot,
-    required int photoCount,
-  });
-}
+  /// What can be booked, with GRID's prices. Needs no sign-in.
+  Future<ServiceCatalogue> catalogue();
 
-/// Service booking has no API yet, so the app can't take a booking. The
-/// booking route shows a "coming soon" screen instead of reaching this.
-class UnavailableServicesApi implements ServicesApi {
-  @override
-  Future<ServiceRequest> submitRequest({
-    required ServiceCategory category,
-    required String issue,
-    required String description,
-    required Property property,
-    required ServiceUrgency urgency,
-    required DateTime preferredDate,
-    required String timeSlot,
-    required int photoCount,
-  }) => throw UnsupportedError('Service booking is not available yet.');
+  /// Whether a home is served for a service and which hours on [date] have
+  /// a professional nearby.
+  Future<ServiceAvailability> availability({
+    required String serviceId,
+    required String propertyId,
+    required DateTime date,
+  });
+
+  /// Books [lines] and sends the MoMo prompt for the total. Reusing
+  /// [idempotencyKey] returns the same booking instead of booking twice.
+  Future<ServiceRequest> book({
+    required List<BookingLine> lines,
+    required String propertyId,
+    required DateTime scheduledAt,
+    required String idempotencyKey,
+    String? notes,
+    List<String> items = const [],
+    String? preferredProviderId,
+  });
+
+  /// The signed-in person's bookings, newest first.
+  Future<List<ServiceRequest>> requests();
+
+  Future<ServiceRequest> request(String id);
+
+  /// Prompts the wallet again after a failed payment.
+  Future<ServiceRequest> pay(String id);
+
+  Future<ServiceRequest> cancel(String id, {String? reason});
+
+  Future<ServiceRequest> confirmCompletion(String id);
+
+  Future<ServiceRequest> review(
+    String id, {
+    required int rating,
+    String? comment,
+  });
 }

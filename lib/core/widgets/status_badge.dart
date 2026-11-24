@@ -26,11 +26,14 @@ class StatusBadge extends StatelessWidget {
   StatusBadge.request(ServiceRequestStatus status, {super.key})
     : label = status.label,
       tone = switch (status) {
-        ServiceRequestStatus.pending => BadgeTone.warning,
+        ServiceRequestStatus.awaitingPayment => BadgeTone.warning,
+        ServiceRequestStatus.paymentFailed => BadgeTone.danger,
+        ServiceRequestStatus.searching => BadgeTone.warning,
         ServiceRequestStatus.assigned => BadgeTone.info,
         ServiceRequestStatus.inProgress => BadgeTone.info,
         ServiceRequestStatus.completed => BadgeTone.success,
         ServiceRequestStatus.cancelled => BadgeTone.neutral,
+        ServiceRequestStatus.unfilled => BadgeTone.neutral,
       };
 
   final String label;

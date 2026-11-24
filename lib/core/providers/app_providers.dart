@@ -48,7 +48,14 @@ final billPaymentsApiProvider = Provider<BillPaymentsApi>(
 );
 
 final servicesApiProvider = Provider<ServicesApi>(
-  (ref) => UnavailableServicesApi(),
+  (ref) => LiveServicesApi(ref.watch(apiClientProvider)),
+);
+
+/// What can be booked. Failing loads surface at once so screens can offer a
+/// retry rather than spinning.
+final catalogueProvider = FutureProvider<ServiceCatalogue>(
+  retry: (retryCount, error) => null,
+  (ref) => ref.watch(servicesApiProvider).catalogue(),
 );
 
 // ---------------------------------------------------------------------------
@@ -381,29 +388,22 @@ final transactionsProvider =
 // Service requests
 // ---------------------------------------------------------------------------
 
-class ServiceRequestsNotifier extends Notifier<List<ServiceRequest>> {
+/// The signed-in person's bookings, kept in step with GRID. Screens replace a
+/// booking here whenever an action returns its new state.
+class ServiceRequestsNotifier extends _ServerListNotifier<ServiceRequest> {
   @override
-  List<ServiceRequest> build() => const [];
+  Future<List<ServiceRequest>> fetch() =>
+      ref.read(servicesApiProvider).requests();
 
-  void insert(ServiceRequest request) => state = [request, ...state];
-
-  void cancel(String id) {
-    state = [
-      for (final r in state)
-        r.id == id
-            ? r.copyWith(
-                status: ServiceRequestStatus.cancelled,
-                timeline: [
-                  ...r.timeline,
-                  TimelineEvent(
-                    title: 'Request cancelled',
-                    subtitle: 'You cancelled this request.',
-                    time: DateTime.now(),
-                  ),
-                ],
-              )
-            : r,
-    ];
+  /// Puts the newest copy of a booking in the list, first if it is new.
+  void put(ServiceRequest request) {
+    final index = state.indexWhere((r) => r.id == request.id);
+    state = index < 0
+        ? [request, ...state]
+        : [
+            for (final r in state)
+              if (r.id == request.id) request else r,
+          ];
   }
 }
 

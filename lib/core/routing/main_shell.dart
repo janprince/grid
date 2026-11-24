@@ -133,7 +133,7 @@ class _Tab extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 2),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? AppColors.navySoft : Colors.transparent,
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(

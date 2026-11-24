@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../services/booking_flow_screen.dart';
 
 class ReminderCard extends StatelessWidget {
   const ReminderCard({super.key, required this.reminder});
@@ -84,9 +83,7 @@ class ReminderCard extends StatelessWidget {
       context.push(Routes.payFlow(utility.name));
       return;
     }
-    final category = reminder.serviceCategory;
-    if (category != null) {
-      context.push(Routes.bookService, extra: BookingArgs(category: category));
-    }
+    final slug = reminder.serviceSlug;
+    if (slug != null) context.push(Routes.service(slug));
   }
 }

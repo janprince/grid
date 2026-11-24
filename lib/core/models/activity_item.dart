@@ -47,13 +47,13 @@ class ActivityItem {
   factory ActivityItem.fromRequest(ServiceRequest req) => ActivityItem(
     id: 'req-${req.id}',
     kind: ActivityKind.service,
-    icon: req.category.icon,
-    title: req.category.label,
-    subtitle: req.issue,
+    icon: Icons.home_repair_service_rounded,
+    title: req.serviceName,
+    subtitle: req.title,
     date: req.createdAt,
     statusLabel: req.status.label,
-    amount: req.finalAmount,
-    propertyLabel: req.propertyLabel,
+    amount: req.total,
+    propertyLabel: req.area,
     request: req,
   );
 

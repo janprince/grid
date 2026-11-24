@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'service_category.dart';
 import 'utility_type.dart';
 
 enum ReminderSeverity { info, warning, urgent }
@@ -15,7 +14,7 @@ class Reminder {
     required this.dueDate,
     required this.severity,
     this.utilityType,
-    this.serviceCategory,
+    this.serviceSlug,
     this.propertyId,
     this.actionLabel,
   });
@@ -30,12 +29,12 @@ class Reminder {
   final UtilityType? utilityType;
 
   /// Set when the reminder resolves to a service booking.
-  final ServiceCategory? serviceCategory;
+  final String? serviceSlug;
   final String? propertyId;
   final String? actionLabel;
 
   IconData get icon =>
       utilityType?.icon ??
-      serviceCategory?.icon ??
+      (serviceSlug != null ? Icons.home_repair_service_rounded : null) ??
       Icons.notifications_active_rounded;
 }

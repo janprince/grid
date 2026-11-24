@@ -2,12 +2,15 @@
 
 GRID is a Ghana-focused home-management app: buy ECG prepaid credit, pay
 Ghana Water, renew DStv/GOtv/StarTimes, top up airtime and data, renew
-fibre, book vetted home cleaning and laundry, and
-keep every home, meter and receipt organised in one place.
+fibre, book vetted home cleaning, laundry, AC servicing and pest control at
+GRID's fixed prices, and keep every home, meter and receipt organised in one
+place.
 
 This repository contains the **mobile MVP**. Sign-in, the profile, homes
 and saved utility accounts run against the GRID API (`../Grid.API`).
-Bill payments are live through the GRID API. Service booking isn't open yet.
+Bill payments and service booking are live through the GRID API: the customer
+picks packages at GRID's prices, pays by Mobile Money at booking, follows the
+professional GRID assigns, confirms the job and rates it.
 
 ## Run it
 
@@ -93,7 +96,7 @@ utility types.
 
 ## What talks to the API
 
-`AuthApi`, `PropertiesApi`, `UtilityAccountsApi` and `BillPaymentsApi` have
+`AuthApi`, `PropertiesApi`, `UtilityAccountsApi`, `BillPaymentsApi` and `ServicesApi` have
 live implementations in `lib/core/data/api/live_repositories.dart`. The client
 contract they follow is
 [`../DOCUMENTATION/api-integration.md`](../DOCUMENTATION/api-integration.md).
@@ -105,28 +108,38 @@ contract they follow is
 - Refresh tokens rotate, so `ApiClient` collapses concurrent 401s onto one
   refresh and then replays the failed requests.
 
+Services come from `GET /service-catalogue`; the app holds no service list of
+its own. `core/theme/service_art.dart` adds only how each slug looks (tint,
+render, fallback glyph). How booking and payment work on the server is in
+[`../Grid.API/docs/marketplace.md`](../Grid.API/docs/marketplace.md).
+
 ## Not built yet
 
-Service booking has no API, so the booking route shows a "coming soon" screen
-and the Services tab has no requests. Reminders are empty for the same reason.
-The widget tests run on in-memory fakes in `test/support/fakes.dart`.
+Reminders are empty: nothing on the server produces them yet. Plumbing and
+electrical (quoted on site) arrive once the API launches them; the app shows
+whatever the catalogue lists. The widget tests run on in-memory fakes in
+`test/support/fakes.dart`.
 
 ## Design system
 
 GRID shares its design system with GRID Pro — navy actions, white flat
 surfaces, Plus Jakarta Sans, one tint per service (mint for cleaning, sky for
-laundry), uppercase button labels. The full reference — tokens, components,
+laundry, violet for AC servicing, olive for pest control), sentence-case
+buttons. A service is shown as a 3D render on its tint
+(`assets/images/services/3d/<slug>.png`), falling back to its older icon and
+then a glyph. The full reference — tokens, components,
 screen templates, writing and accessibility rules — is
 [`../DOCUMENTATION/design-system.md`](../DOCUMENTATION/design-system.md).
 
 - **Tokens** — `core/theme/app_colors.dart`, `app_theme.dart` (`AppText`),
-  `app_spacing.dart`, `service_art.dart` (service tints).
+  `app_spacing.dart`, `service_art.dart` (service tints and artwork by slug).
 - **Shared components** — `core/widgets/system.dart` (`PrimaryButton`,
   `AppHeader`, `NavyPanel`, `TintCard`, `DetailGroup`, `MenuGroup`,
   `showConfirmationSheet`, …) and `service_widgets.dart`, named as in GRID Pro.
-- **Services** — v1 books two: home cleaning and laundry
-  (`core/models/service_category.dart`). The emergency call-out flow was
-  removed with the trade categories.
+- **Services** — whatever `/service-catalogue` lists
+  (`core/models/service_catalogue.dart`): at launch home cleaning, laundry,
+  AC servicing and pest control. Screens are in `features/services/`
+  (hub, service page, booking flow, booking details).
 
 All spacing, radii and gaps come from `core/theme/app_spacing.dart` —
 avoid hardcoded values in screens.

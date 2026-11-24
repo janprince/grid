@@ -22,8 +22,11 @@ abstract final class Routes {
   static const privacy = '/profile/privacy';
 
   static String payFlow(String type) => '/pay/flow/$type';
+  static String payChoose(String group) => '/pay/choose/$group';
   static String property(String id) => '/properties/$id';
   static String editProperty(String id) => '/properties/$id/edit';
-  static const bookService = '/services/book';
+  static const servicesSearch = '/services?search=1';
+  static String service(String slug) => '/services/$slug';
+  static String bookService(String slug) => '/services/$slug/book';
   static String serviceRequest(String id) => '/services/request/$id';
 }

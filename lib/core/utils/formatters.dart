@@ -3,9 +3,16 @@ import 'package:intl/intl.dart';
 /// Ghana-centric formatting helpers.
 abstract final class Fmt {
   static final NumberFormat _cedis = NumberFormat('#,##0.00');
+  static final NumberFormat _wholeCedis = NumberFormat('#,##0');
 
   /// e.g. `GH₵ 450.00`
   static String cedis(double amount) => 'GH₵ ${_cedis.format(amount)}';
+
+  /// A starting price without empty pesewas, e.g. `GH₵ 150`. An amount that
+  /// has pesewas keeps them.
+  static String cedisShort(double amount) => amount == amount.roundToDouble()
+      ? 'GH₵ ${_wholeCedis.format(amount)}'
+      : cedis(amount);
 
   /// e.g. `24 Oct 2025`
   static String date(DateTime d) => DateFormat('d MMM yyyy').format(d);

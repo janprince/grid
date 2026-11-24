@@ -6,14 +6,11 @@ import '../../core/models/models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/formatters.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/service_art.dart';
 import '../../core/widgets/widgets.dart';
 import '../activity/widgets/activity_tile.dart';
 import '../payments/widgets/transaction_receipt_sheet.dart';
-import '../services/booking_flow_screen.dart';
+import '../services/services_hub_screen.dart';
 import 'widgets/home_ground.dart';
 import 'widgets/pay_shortcuts.dart';
 import 'widgets/reminder_card.dart';
@@ -27,6 +24,12 @@ class DashboardScreen extends ConsumerWidget {
     final homesLoaded = ref.watch(homesLoadedProvider);
     final reminders = ref.watch(remindersProvider);
     final activity = ref.watch(activityProvider).take(4).toList();
+    final upcoming =
+        ref
+            .watch(serviceRequestsProvider)
+            .where((r) => r.status.isOpen || r.awaitingConfirmation)
+            .toList()
+          ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     return Scaffold(
       // No SafeArea here: the navy ground runs up under the status bar so
@@ -59,22 +62,45 @@ class DashboardScreen extends ConsumerWidget {
                   )
                 : _GroundWithSheetLip(child: HomeGround(property: property)),
           ),
-          const SliverToBoxAdapter(
-            child: SectionHeader(
-              title: 'Pay something',
-              padding: EdgeInsets.fromLTRB(
-                Insets.xl,
-                Insets.xxl,
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
                 Insets.xl,
                 Insets.lg,
+                Insets.xl,
+                0,
+              ),
+              child: _SearchPill(
+                onTap: () => context.go(Routes.servicesSearch),
               ),
             ),
           ),
-          const SliverToBoxAdapter(child: PayShortcuts()),
+          if (upcoming.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: SectionHeader(title: 'Your next booking'),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
+                child: BookingTile(request: upcoming.first),
+              ),
+            ),
+          ],
+          // Bills are what brings people back each week, so they stay near
+          // the top; services follow with room to show themselves off.
           const SliverToBoxAdapter(
-            child: SectionHeader(title: 'Book a service'),
+            child: SectionHeader(title: 'Pay something'),
+          ),
+          const SliverToBoxAdapter(child: PayShortcuts()),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: 'Book a service',
+              actionLabel: 'See all',
+              onAction: () => context.go(Routes.services),
+            ),
           ),
           const SliverToBoxAdapter(child: _ServiceShortcuts()),
+          const SliverToBoxAdapter(child: _Featured()),
           if (reminders.isNotEmpty) ...[
             const SliverToBoxAdapter(
               child: SectionHeader(title: 'Upcoming reminders'),
@@ -114,13 +140,13 @@ class DashboardScreen extends ConsumerWidget {
                       compact: true,
                     ),
                   )
-                : SliverList.separated(
+                : SliverList.builder(
                     itemCount: activity.length,
-                    separatorBuilder: (_, _) => Gaps.sm,
                     itemBuilder: (context, i) {
                       final item = activity[i];
                       return ActivityTile(
                         item: item,
+                        divider: i != activity.length - 1,
                         onTap: () {
                           if (item.transaction != null) {
                             showTransactionSheet(context, item.transaction!);
@@ -170,58 +196,116 @@ class _GroundWithSheetLip extends StatelessWidget {
   }
 }
 
-/// The two services as compact tinted tiles, side by side.
-class _ServiceShortcuts extends StatelessWidget {
+/// "Search for a service": opens the Services tab with the keyboard up.
+class _SearchPill extends StatelessWidget {
+  const _SearchPill({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Search for a service',
+    excludeSemantics: true,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: Corners.pill,
+      child: Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: Corners.pill,
+          boxShadow: AppColors.raisedShadow,
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.search_rounded, color: AppColors.ink),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'What do you need done?',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 15.5, color: AppColors.muted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Fixed-price services, one card each, swiped sideways.
+class _Featured extends ConsumerWidget {
+  const _Featured();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final services =
+        ref.watch(catalogueProvider).value?.services ?? const <ServiceItem>[];
+    if (services.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 28),
+      child: SizedBox(
+        height: 172,
+        child: PageView.builder(
+          controller: PageController(viewportFraction: 0.88),
+          padEnds: false,
+          itemCount: services.length,
+          itemBuilder: (context, i) => Padding(
+            padding: EdgeInsets.fromLTRB(i == 0 ? Insets.xl : 6, 4, 6, 12),
+            child: FeaturedServiceCard(
+              service: services[i],
+              onTap: () => context.push(Routes.service(services[i].slug)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The first four services as square tiles; the rest are a tap away.
+class _ServiceShortcuts extends ConsumerWidget {
   const _ServiceShortcuts();
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
-    child: Row(
-      children: [
-        for (final category in ServiceCategory.values) ...[
-          Expanded(
-            child: GestureDetector(
-              onTap: () => context.push(
-                Routes.bookService,
-                extra: BookingArgs(category: category),
-              ),
-              child: Semantics(
-                button: true,
-                label: 'Book ${category.label}',
-                excludeSemantics: true,
-                child: TintCard(
-                  tint: category.tint,
-                  arc: category.arc,
-                  padding: const EdgeInsets.all(Insets.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ServiceBadge(category: category, size: 40),
-                      Gaps.lg,
-                      Text(
-                        category.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.subtitle.copyWith(fontSize: 16),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'From ${Fmt.cedis(category.fromPrice)}',
-                        style: AppText.caption.copyWith(
-                          color: category.ink,
-                          fontFeatures: AppText.tabularFigures,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catalogue = ref.watch(catalogueProvider);
+    final services = (catalogue.value?.services ?? const <ServiceItem>[])
+        .take(4)
+        .toList();
+    if (services.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
+        child: catalogue.hasError
+            ? TextLink(
+                label: 'Couldn\'t load services. Try again',
+                onPressed: () => ref.invalidate(catalogueProvider),
+              )
+            : const SkeletonCard(height: 110),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < 4; i++) ...[
+            Expanded(
+              child: i < services.length
+                  ? ServiceTile(
+                      service: services[i],
+                      onTap: () =>
+                          context.push(Routes.service(services[i].slug)),
+                    )
+                  : const SizedBox.shrink(),
             ),
-          ),
-          if (category != ServiceCategory.values.last) Gaps.md,
+            if (i != 3) Gaps.md,
+          ],
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

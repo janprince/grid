@@ -24,6 +24,7 @@ class AmountField extends StatelessWidget {
     this.quickAmounts = const [],
     this.onChanged,
     this.autofocus = true,
+    this.underline = false,
   });
 
   final TextEditingController controller;
@@ -32,6 +33,16 @@ class AmountField extends StatelessWidget {
   final List<int> quickAmounts;
   final ValueChanged<String>? onChanged;
   final bool autofocus;
+
+  /// Rules a line under the figure, so the amount reads as the one field
+  /// on a page with nothing else to fill in.
+  final bool underline;
+
+  /// Larger on the ruled variant, where the figure is the whole page.
+  TextStyle? _figure(ThemeData theme) {
+    final base = theme.textTheme.displayMedium?.tabular;
+    return underline ? base?.copyWith(fontSize: 56, height: 1.1) : base;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +58,7 @@ class AmountField extends StatelessWidget {
             Padding(
               // Optically aligns the currency with the cap height of the
               // figure rather than its full ascent.
-              padding: const EdgeInsets.only(top: 10),
+              padding: EdgeInsets.only(top: underline ? 18 : 10),
               child: Text(
                 'GH₵',
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -68,7 +79,7 @@ class AmountField extends StatelessWidget {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
                 textAlign: TextAlign.left,
-                style: theme.textTheme.displayMedium?.tabular,
+                style: _figure(theme),
                 cursorColor: AppColors.navy,
                 cursorWidth: 3,
                 decoration: InputDecoration(
@@ -79,14 +90,16 @@ class AmountField extends StatelessWidget {
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   hintText: '0',
-                  hintStyle: theme.textTheme.displayMedium?.tabular.copyWith(
-                    color: AppColors.line,
-                  ),
+                  hintStyle: _figure(theme)?.copyWith(color: AppColors.line),
                 ),
               ),
             ),
           ],
         ),
+        if (underline) ...[
+          Gaps.lg,
+          Container(height: 1.5, color: AppColors.lineStrong),
+        ],
         if (quickAmounts.isNotEmpty) ...[
           Gaps.xxl,
           SizedBox(

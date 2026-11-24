@@ -121,6 +121,8 @@ class LivePropertiesApi implements PropertiesApi {
     kind: _fromWire(PropertyKind.values, json['kind'], PropertyKind.house),
     isPrimary: json['isPrimary'] as bool? ?? false,
     ghanaPostGps: json['ghanaPostGps'] as String?,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
   );
 
   static Map<String, dynamic> _body(Property p) => {
@@ -130,6 +132,8 @@ class LivePropertiesApi implements PropertiesApi {
     'city': p.city,
     'address': p.address,
     'ghanaPostGps': p.ghanaPostGps,
+    'latitude': p.latitude,
+    'longitude': p.longitude,
   };
 
   @override
@@ -349,6 +353,257 @@ class LiveBillPaymentsApi implements BillPaymentsApi {
       refundAmount: _money(refund?['amount']),
       savedAccountId: json['savedAccountId'] as String?,
       propertyId: json['propertyId'] as String?,
+    );
+  }
+}
+
+class LiveServicesApi implements ServicesApi {
+  LiveServicesApi(this._client);
+
+  final ApiClient _client;
+
+  @override
+  Future<ServiceCatalogue> catalogue() async {
+    final data = await _client.get<Map<String, dynamic>>('/service-catalogue');
+    return ServiceCatalogue(
+      sections: [
+        for (final section
+            in (data['sections'] as List<dynamic>).cast<Map<String, dynamic>>())
+          ServiceSection(
+            name: section['name'] as String,
+            services: [
+              for (final row
+                  in (section['services'] as List<dynamic>)
+                      .cast<Map<String, dynamic>>())
+                _service(row, section['name'] as String),
+            ],
+          ),
+      ],
+    );
+  }
+
+  static ServiceItem _service(Map<String, dynamic> row, String section) =>
+      ServiceItem(
+        id: row['id'] as String,
+        slug: row['slug'] as String,
+        name: row['name'] as String,
+        description: row['description'] as String? ?? '',
+        section: section,
+        bookingMode: _fromWire(
+          BookingMode.values,
+          row['bookingMode'],
+          BookingMode.fixedPrice,
+        ),
+        fromPrice: (row['fromPrice'] as num?)?.toDouble() ?? 0,
+        skills: [for (final s in (row['skills'] as List? ?? const [])) '$s'],
+        packages: [
+          for (final p
+              in (row['packages'] as List<dynamic>? ?? const [])
+                  .cast<Map<String, dynamic>>())
+            ServicePackage(
+              id: p['id'] as String,
+              slug: p['slug'] as String,
+              group: p['group'] as String,
+              name: p['name'] as String,
+              summary: p['summary'] as String?,
+              includes: [
+                for (final i in (p['includes'] as List? ?? const [])) '$i',
+              ],
+              excludes: [
+                for (final i in (p['excludes'] as List? ?? const [])) '$i',
+              ],
+              price: (p['price'] as num).toDouble(),
+              durationMinutes: (p['durationMinutes'] as num?)?.toInt() ?? 0,
+              unitLabel: p['unitLabel'] as String?,
+              maxQuantity: (p['maxQuantity'] as num?)?.toInt() ?? 1,
+            ),
+        ],
+      );
+
+  @override
+  Future<ServiceAvailability> availability({
+    required String serviceId,
+    required String propertyId,
+    required DateTime date,
+  }) async {
+    final day =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final data = await _client.get<Map<String, dynamic>>(
+      '/service-requests/availability',
+      query: {
+        'serviceCategoryId': serviceId,
+        'propertyId': propertyId,
+        'date': day,
+      },
+    );
+    return ServiceAvailability(
+      served: data['served'] as bool? ?? false,
+      area: data['area'] as String?,
+      providersNearby: (data['providersNearby'] as num?)?.toInt() ?? 0,
+      slots: [
+        for (final slot
+            in (data['slots'] as List<dynamic>? ?? const [])
+                .cast<Map<String, dynamic>>())
+          ServiceSlot(
+            startsAt: _date(slot['startsAt'])!,
+            available: slot['available'] as bool? ?? false,
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<ServiceRequest> book({
+    required List<BookingLine> lines,
+    required String propertyId,
+    required DateTime scheduledAt,
+    required String idempotencyKey,
+    String? notes,
+    List<String> items = const [],
+    String? preferredProviderId,
+  }) async => parseRequest(
+    await _client.post<Map<String, dynamic>>(
+      '/service-requests',
+      headers: {'Idempotency-Key': idempotencyKey},
+      body: {
+        'lines': [
+          for (final line in lines)
+            {'packageId': line.package.id, 'quantity': line.quantity},
+        ],
+        'propertyId': propertyId,
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        'notes': ?notes,
+        'items': items,
+        'preferredProviderAccountId': ?preferredProviderId,
+      },
+    ),
+  );
+
+  @override
+  Future<List<ServiceRequest>> requests() async => [
+    for (final row in (await _client.get<List<dynamic>>(
+      '/service-requests',
+    )).cast<Map<String, dynamic>>())
+      parseRequest(row),
+  ];
+
+  @override
+  Future<ServiceRequest> request(String id) async => parseRequest(
+    await _client.get<Map<String, dynamic>>('/service-requests/$id'),
+  );
+
+  @override
+  Future<ServiceRequest> pay(String id) async => parseRequest(
+    await _client.post<Map<String, dynamic>>('/service-requests/$id/pay'),
+  );
+
+  @override
+  Future<ServiceRequest> cancel(String id, {String? reason}) async =>
+      parseRequest(
+        await _client.post<Map<String, dynamic>>(
+          '/service-requests/$id/cancel',
+          body: {'reason': ?reason},
+        ),
+      );
+
+  @override
+  Future<ServiceRequest> confirmCompletion(String id) async => parseRequest(
+    await _client.post<Map<String, dynamic>>(
+      '/service-requests/$id/confirm-completion',
+    ),
+  );
+
+  @override
+  Future<ServiceRequest> review(
+    String id, {
+    required int rating,
+    String? comment,
+  }) async => parseRequest(
+    await _client.post<Map<String, dynamic>>(
+      '/service-requests/$id/review',
+      body: {'rating': rating, 'comment': ?comment},
+    ),
+  );
+
+  static ServiceRequest parseRequest(Map<String, dynamic> json) {
+    final payment = json['payment'] as Map<String, dynamic>?;
+    final provider = json['provider'] as Map<String, dynamic>?;
+    final review = json['review'] as Map<String, dynamic>?;
+    return ServiceRequest(
+      id: json['id'] as String,
+      reference: json['reference'] as String,
+      serviceSlug: json['serviceCategory'] as String,
+      serviceName: json['serviceName'] as String? ?? '',
+      bookingMode: _fromWire(
+        BookingMode.values,
+        json['bookingMode'],
+        BookingMode.fixedPrice,
+      ),
+      title: json['title'] as String? ?? '',
+      scope: json['scope'] as String?,
+      lines: [
+        for (final line
+            in (json['lines'] as List<dynamic>? ?? const [])
+                .cast<Map<String, dynamic>>())
+          RequestLine(
+            packageId: line['packageId'] as String,
+            name: line['name'] as String,
+            unitLabel: line['unitLabel'] as String?,
+            unitPrice: (line['unitPrice'] as num).toDouble(),
+            quantity: (line['quantity'] as num).toInt(),
+            total: (line['total'] as num).toDouble(),
+          ),
+      ],
+      total: (json['total'] as num?)?.toDouble() ?? 0,
+      items: [for (final i in (json['items'] as List? ?? const [])) '$i'],
+      notes: json['notes'] as String?,
+      propertyId: json['propertyId'] as String?,
+      area: json['area'] as String? ?? '',
+      city: json['city'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      scheduledAt: _date(json['scheduledAt']) ?? DateTime.now(),
+      status: _fromWire(
+        ServiceRequestStatus.values,
+        json['status'],
+        ServiceRequestStatus.searching,
+      ),
+      payment: payment == null
+          ? null
+          : ServicePaymentInfo(
+              status: _fromWire(
+                ServicePaymentStatus.values,
+                payment['status'],
+                ServicePaymentStatus.awaitingApproval,
+              ),
+              amount: (payment['amount'] as num?)?.toDouble() ?? 0,
+              channel: payment['channel'] as String? ?? '',
+              payerPhone: payment['payerPhone'] as String? ?? '',
+              error: payment['error'] as String?,
+              paidAt: _date(payment['paidAt']),
+              refundedAt: _date(payment['refundedAt']),
+            ),
+      jobCode: json['jobCode'] as String?,
+      jobStage: json['jobStage'] as String?,
+      provider: provider == null
+          ? null
+          : AssignedProvider(
+              id: provider['id'] as String,
+              name: provider['displayName'] as String? ?? '',
+              phone: provider['phoneNumber'] as String? ?? '',
+              completedJobs: (provider['completedJobs'] as num?)?.toInt() ?? 0,
+              rating: (provider['rating'] as num?)?.toDouble(),
+              reviews: (provider['reviews'] as num?)?.toInt() ?? 0,
+            ),
+      review: review == null
+          ? null
+          : RequestReview(
+              rating: (review['rating'] as num).toInt(),
+              comment: review['comment'] as String?,
+            ),
+      canCancel: json['canCancel'] as bool? ?? false,
+      createdAt: _date(json['createdAt']) ?? DateTime.now(),
     );
   }
 }

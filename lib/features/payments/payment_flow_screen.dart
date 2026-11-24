@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,24 +14,29 @@ import '../../core/providers/app_providers.dart';
 import '../../core/routing/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/biller_brand.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/widgets.dart';
+import 'widgets/bundle_grid.dart';
+import 'widgets/pay_flow_parts.dart';
+import 'widgets/pay_pending_view.dart';
 import 'widgets/payment_result_view.dart';
 
 enum _Phase { steps, placing, approving, result }
 
 /// One flow for every bill. The [UtilityType] drives labels and validation.
 ///
-/// Steps: account (checked with the biller) → amount or bundle → review.
-/// Confirming places the order, which sends a MoMo prompt to the signed-in
-/// number; the screen then waits for the approval and the biller's answer.
+/// Each screen asks one thing: whose account (checked with the biller), then
+/// how much or which bundle. A sheet then shows everything once more with the
+/// wallet that pays; confirming sends a MoMo prompt to the signed-in number
+/// and the screen waits for the approval and the biller's answer.
 class PaymentFlowScreen extends ConsumerStatefulWidget {
   const PaymentFlowScreen({
     super.key,
     required this.type,
     this.initialAccountId,
+    this.network,
   });
 
   final UtilityType type;
@@ -39,26 +45,27 @@ class PaymentFlowScreen extends ConsumerStatefulWidget {
   /// preselected and checked straight away.
   final String? initialAccountId;
 
+  /// The network picked before the flow, for airtime and data.
+  final MobileNetwork? network;
+
   @override
   ConsumerState<PaymentFlowScreen> createState() => _PaymentFlowScreenState();
 }
 
 class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
-  static const _stepCount = 3;
-
   _Phase _phase = _Phase.steps;
   int _step = 0;
   bool _busy = false;
 
-  // Step 1 — account
+  // Step 1 — whose account
   UtilityAccount? _selectedAccount;
-  bool _enterNew = false;
-  final _newAccountForm = GlobalKey<FormState>();
+  final _form = GlobalKey<FormState>();
   final _numberCtrl = TextEditingController();
-  final _nicknameCtrl = TextEditingController();
+  bool _useMyNumber = false;
+  String? _contactName;
   bool _saveNew = true;
   bool _postpaid = false;
-  MobileNetwork? _network;
+  late MobileNetwork? _network;
   String? _propertyId;
 
   /// What the biller said about the chosen account.
@@ -70,8 +77,8 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
   BillBundle? _bundle;
   String? _amountError;
 
-  // Step 3 — the wallet that pays
-  MobileNetwork? _wallet;
+  /// The wallet that pays.
+  late MobileNetwork _wallet;
 
   /// One key per confirmation, so a double tap or a retried request can't
   /// place two orders.
@@ -81,12 +88,16 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
   UtilityType get type => widget.type;
 
   String get _payerPhone => ref.read(sessionProvider).user?.phone ?? '';
+  String get _payerName => ref.read(sessionProvider).user?.name ?? '';
 
   @override
   void initState() {
     super.initState();
     _propertyId = ref.read(selectedPropertyProvider)?.id;
     _wallet = MobileNetwork.guess(_payerPhone) ?? MobileNetwork.mtn;
+    _network = type.isPhoneAccount
+        ? widget.network ?? MobileNetwork.guess(_payerPhone)
+        : null;
     if (widget.initialAccountId != null) {
       final match = ref
           .read(accountsByTypeProvider(type))
@@ -102,7 +113,6 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
   @override
   void dispose() {
     _numberCtrl.dispose();
-    _nicknameCtrl.dispose();
     _amountCtrl.dispose();
     super.dispose();
   }
@@ -115,18 +125,52 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
       _selectedAccount?.accountNumber ??
       _numberCtrl.text.replaceAll(RegExp(r'[\s-]'), '').toUpperCase();
 
-  String get _accountNickname {
-    if (_selectedAccount != null) return _selectedAccount!.nickname;
-    final nickname = _nicknameCtrl.text.trim();
-    return nickname.isEmpty
-        ? 'New ${type.accountLabel.toLowerCase()}'
-        : nickname;
+  /// Who the person is paying, in the words they'd use.
+  String get _recipientName {
+    final saved = _selectedAccount;
+    if (type.isPhoneAccount) {
+      if (_contactName case final name? when name.trim().isNotEmpty) {
+        return name.trim();
+      }
+      if (saved != null) return saved.nickname;
+      return _useMyNumber ? 'My number' : '${_network?.label ?? ''} number';
+    }
+    final name = _lookup?.customerName.trim() ?? '';
+    if (name.isNotEmpty) return name;
+    return saved?.nickname ?? 'My ${type.accountLabel.toLowerCase()}';
   }
+
+  /// The name a new account is saved under.
+  String get _newNickname {
+    if (type.isPhoneAccount) {
+      return _useMyNumber && _contactName == null
+          ? 'My number'
+          : _recipientName;
+    }
+    final name = _lookup?.customerName.trim() ?? '';
+    return name.isEmpty
+        ? 'My ${type.accountLabel.toLowerCase()}'
+        : _titleCase(name);
+  }
+
+  static String _titleCase(String value) => value
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
 
   /// "200.00" reads as noise at display size; "200" is the amount.
   static String _trimAmount(double value) => value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(2);
+
+  /// `+233 55 123 4567`, `233551234567` → `0551234567`.
+  static String _localPhone(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('233')) digits = digits.substring(3);
+    if (digits.length == 9) digits = '0$digits';
+    return digits;
+  }
 
   double? get _amount => type.isPlanBased
       ? _bundle?.amount
@@ -135,44 +179,63 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
   double get _minAmount => _lookup?.minAmount ?? 1;
   double get _maxAmount => _lookup?.maxAmount ?? 1000;
 
-  bool get _canContinue => switch (_step) {
-    0 => _selectedAccount != null || _enterNew,
-    1 =>
-      type.isPlanBased
-          ? _bundle != null
-          : Validators.amount(
-                  _amountCtrl.text,
-                  min: _minAmount,
-                  max: _maxAmount,
-                ) ==
-                null,
-    _ => _wallet != null,
-  };
+  bool get _amountValid =>
+      Validators.amount(_amountCtrl.text, min: _minAmount, max: _maxAmount) ==
+      null;
 
   BillTarget get _target {
-    final network = type.isPhoneAccount
-        ? (_network ?? MobileNetwork.guess(_accountNumber))
-        : null;
     final ecgKind =
         _selectedAccount?.ecgKind ??
         (_postpaid ? EcgKind.postpaid : EcgKind.prepaid);
     final target = BillTarget(
-      productCode: billProductCode(type, network: network, ecgKind: ecgKind),
+      productCode: billProductCode(
+        type,
+        network: type.isPhoneAccount
+            ? (_network ?? MobileNetwork.guess(_accountNumber))
+            : null,
+        ecgKind: ecgKind,
+      ),
       accountNumber: _accountNumber,
     );
     return _meterNumber == null ? target : target.withMeter(_meterNumber!);
   }
 
+  /// Saved accounts for this flow; for airtime and data, on this network.
+  List<UtilityAccount> get _saved => ref
+      .watch(accountsByTypeProvider(type))
+      .where(
+        (a) =>
+            !type.isPhoneAccount ||
+            (a.network ?? MobileNetwork.guess(a.accountNumber)) == _network,
+      )
+      .toList();
+
   void _choose(UtilityAccount account) {
     _selectedAccount = account;
-    _enterNew = false;
-    _network = account.network ?? MobileNetwork.guess(account.accountNumber);
+    _numberCtrl.text = account.accountNumber;
+    _contactName = null;
+    _useMyNumber = false;
+    _network = type.isPhoneAccount
+        ? account.network ??
+              MobileNetwork.guess(account.accountNumber) ??
+              _network
+        : null;
     _propertyId = account.propertyId ?? _propertyId;
+    _lookup = null;
+    _meterNumber = null;
     if (account.lastAmount != null &&
         !type.isPlanBased &&
         _amountCtrl.text.isEmpty) {
       _amountCtrl.text = _trimAmount(account.lastAmount!);
     }
+  }
+
+  /// The number typed or picked changed: whatever was known about the old
+  /// one no longer applies.
+  void _numberChanged() {
+    _selectedAccount = null;
+    _lookup = null;
+    _meterNumber = null;
   }
 
   // -------------------------------------------------------------------------
@@ -182,7 +245,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
   void _back() {
     if (_phase != _Phase.steps || _busy) return;
     if (_step > 0) {
-      setState(() => _step--);
+      setState(() => _step = 0);
     } else {
       context.pop();
     }
@@ -190,13 +253,20 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
 
   Future<void> _continue() async {
     if (_step == 0) {
-      if (_enterNew && !(_newAccountForm.currentState?.validate() ?? false)) {
-        return;
+      if (_selectedAccount == null) {
+        if (!(_form.currentState?.validate() ?? false)) return;
+        // A number typed in full that is already saved pays as that account.
+        final match = ref
+            .read(accountsByTypeProvider(type))
+            .where((a) => a.accountNumber.toUpperCase() == _accountNumber)
+            .firstOrNull;
+        if (match != null) _selectedAccount = match;
       }
+      FocusScope.of(context).unfocus();
       if (await _checkAccount()) setState(() => _step = 1);
       return;
     }
-    if (_step == 1 && !type.isPlanBased) {
+    if (!type.isPlanBased) {
       final error = Validators.amount(
         _amountCtrl.text,
         min: _minAmount,
@@ -205,11 +275,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
       setState(() => _amountError = error);
       if (error != null) return;
     }
-    if (_step < _stepCount - 1) {
-      setState(() => _step++);
-    } else {
-      await _pay();
-    }
+    await _confirm();
   }
 
   /// Asks the biller about the account. When the phone has several ECG
@@ -243,6 +309,51 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     }
   }
 
+  /// Everything once more, with the wallet that pays. Confirming pays.
+  Future<void> _confirm() async {
+    final amount = _amount;
+    if (amount == null) return;
+    final lookup = _lookup;
+    final confirmed = await showModalBottomSheet<_Confirmed>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      builder: (_) => _ConfirmSheet(
+        type: type,
+        amount: amount,
+        chargePercent: lookup?.chargePercent ?? 0,
+        wallet: _wallet,
+        payerPhone: _payerPhone,
+        payerName: _payerName,
+        propertyId: type.isPhoneAccount ? null : _propertyId,
+        rows: [
+          if (type.isPhoneAccount) ...[
+            ('Recipient', Fmt.ghanaPhone(_accountNumber)),
+            if (_contactName != null || _selectedAccount != null)
+              ('Name', _recipientName),
+            ('Network', _network?.label ?? ''),
+          ] else ...[
+            (type.accountLabel, lookup?.accountNumber ?? _accountNumber),
+            if (lookup != null && lookup.customerName.isNotEmpty)
+              ('Name', lookup.customerName),
+          ],
+          if (_bundle != null) ('Bundle', BundleFacts.of(_bundle!).summary),
+          (
+            type.isPlanBased ? 'Price' : '${type.shortNoun} amount',
+            Fmt.cedis(amount),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == null || !mounted) return;
+    setState(() {
+      _wallet = confirmed.wallet;
+      _propertyId = confirmed.propertyId ?? _propertyId;
+    });
+    await _pay();
+  }
+
   Future<void> _pay() async {
     _idempotencyKey ??= _newKey();
     setState(() => _phase = _Phase.placing);
@@ -254,7 +365,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
             amount: _amount!,
             idempotencyKey: _idempotencyKey!,
             bundle: _bundle?.value,
-            channel: _wallet!.channel,
+            channel: _wallet.channel,
             savedAccountId: _selectedAccount?.id,
             propertyId: type.isPhoneAccount ? null : _propertyId,
           );
@@ -293,7 +404,7 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
             id: '',
             type: type,
             accountNumber: _lookup?.accountNumber ?? _accountNumber,
-            nickname: _accountNickname,
+            nickname: _newNickname,
             propertyId: type.isPhoneAccount ? null : _propertyId,
             network: type.isPhoneAccount ? _network : null,
             ecgKind: type == UtilityType.ecg
@@ -305,13 +416,24 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     }
   }
 
+  /// Leaves the wait; the order carries on and Activity shows how it ends.
+  void _leaveWait() {
+    unawaited(ref.read(transactionsProvider.notifier).refresh());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Still going. Activity will show how it ends.'),
+      ),
+    );
+    context.go(Routes.activity);
+  }
+
   void _retry() {
     setState(() {
       _idempotencyKey =
           null; // A declined order is final; try again with a new one.
       _order = null;
       _phase = _Phase.steps;
-      _step = _stepCount - 1;
+      _step = 1;
     });
   }
 
@@ -331,6 +453,31 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     }
   }
 
+  Future<void> _pickContact() async {
+    try {
+      final contact = await FlutterNativeContactPicker().selectPhoneNumber();
+      final raw =
+          contact?.selectedPhoneNumber ?? contact?.phoneNumbers?.firstOrNull;
+      if (raw == null || !mounted) return;
+      setState(() {
+        _numberChanged();
+        _useMyNumber = false;
+        _numberCtrl.text = _localPhone(raw);
+        _contactName = contact?.fullName;
+      });
+      _form.currentState?.validate();
+    } on Object {
+      _toast('Couldn\'t open your contacts. Type the number instead.');
+    }
+  }
+
+  void _toggleMyNumber(bool on) => setState(() {
+    _numberChanged();
+    _useMyNumber = on;
+    _contactName = null;
+    _numberCtrl.text = on ? _localPhone(_payerPhone) : '';
+  });
+
   void _toast(String message) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
@@ -343,6 +490,27 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     ).join();
   }
 
+  Future<String?> _pickMeter(List<MeterChoice> meters) =>
+      showAppBottomSheet<String>(
+        context,
+        title: 'Which meter?',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final m in meters) ...[
+              SelectionTile(
+                selected: false,
+                onTap: () => Navigator.of(context).pop(m.meterNumber),
+                title: m.customerName.isEmpty ? m.meterNumber : m.customerName,
+                subtitle: m.meterNumber,
+                leading: BillerMark(type, size: 40),
+              ),
+              Gaps.md,
+            ],
+          ],
+        ),
+      );
+
   // -------------------------------------------------------------------------
   // Build
   // -------------------------------------------------------------------------
@@ -352,22 +520,26 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     final order = _order;
     switch (_phase) {
       case _Phase.placing:
-        return _WaitingView(
+        return PayPendingView(
           title: 'Sending the payment request',
           message:
               'Your phone will ask you to approve ${Fmt.cedis(_amount ?? 0)}.',
+          wallet: _wallet,
+          footer: const SizedBox(height: 52),
         );
       case _Phase.approving when order != null:
-        return _ApprovalView(
+        return _ApprovalPoller(
           order: order,
           payerPhone: _payerPhone,
+          wallet: _wallet,
           onSettled: _settled,
+          onLeave: _leaveWait,
         );
       case _Phase.result when order != null:
         final saved = _selectedAccount;
         return PaymentResultView(
           transaction: order.toTransaction(
-            nickname: saved?.nickname ?? (_enterNew ? _accountNickname : null),
+            nickname: saved?.nickname ?? _newNickname,
             propertyLabel: ref
                 .read(propertyByIdProvider(order.propertyId))
                 ?.nickname,
@@ -380,226 +552,237 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
         break;
     }
 
-    return StepFlowScaffold(
-      title: type.label,
-      subtitle: type.providerName,
-      step: _step,
-      stepCount: _stepCount,
+    final lookup = _lookup;
+    return PayFlowScaffold(
+      title: type.flowTitle,
       onBack: _back,
-      totalLabel: 'Total',
-      totalValue: _step == 0 || _amount == null ? null : Fmt.cedis(_amount!),
-      bottomBar: PrimaryButton(
-        label: _step == _stepCount - 1 ? 'Confirm & pay' : 'Continue',
-        busy: _busy,
-        busyLabel: 'Checking',
-        onPressed: _canContinue ? _continue : null,
-      ),
-      child: StepTransition(
+      onClose: _busy ? null : () => context.pop(),
+      canPop: false,
+      above: _step == 0
+          ? const PayFootnote(
+              'No GRID fee. You pay from your Mobile Money.',
+              icon: Icons.verified_user_outlined,
+            )
+          : RecipientChip(
+              type: type,
+              network: _network,
+              name: _recipientName,
+              number: lookup?.accountNumber ?? _accountNumber,
+              onTap: _back,
+            ),
+      action: _step == 1 && type.isPlanBased
+          ? null
+          : PrimaryButton(
+              label: 'Continue',
+              busy: _busy,
+              busyLabel: 'Checking',
+              onPressed: _step == 0 || _amountValid ? _continue : null,
+            ),
+      body: StepTransition(
         stepKey: _step,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Insets.xl),
-          child: switch (_step) {
-            0 => _buildAccountStep(),
-            1 => _buildAmountStep(),
-            _ => _buildReviewStep(),
-          },
-        ),
+        child: switch (_step) {
+          0 => _buildAccountStep(),
+          _ when type.isPlanBased => _buildBundleStep(),
+          _ => _buildAmountStep(),
+        },
       ),
     );
   }
 
-  // Step 1 — choose account -------------------------------------------------
+  // Step 1 — whose account ----------------------------------------------------
 
   Widget _buildAccountStep() {
-    final theme = Theme.of(context);
-    final accounts = ref.watch(accountsByTypeProvider(type));
+    final saved = _saved;
+    final network = _network;
+    final guessed = type.isPhoneAccount
+        ? MobileNetwork.guess(_numberCtrl.text)
+        : null;
+    final title = type.isPhoneAccount
+        ? 'Recipient\'s ${network?.label ?? 'phone'} number'
+        : type.accountLabel;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        Insets.xl,
+        Insets.md,
+        Insets.xl,
+        Insets.xl,
+      ),
       children: [
-        Text(
-          type.isPhoneAccount
-              ? 'Who is this for?'
-              : 'Which ${type.accountLabel.toLowerCase()}?',
-          style: theme.textTheme.headlineMedium,
-        ),
-        Gaps.sm,
-        Text(
-          accounts.isEmpty
-              ? 'Enter the details below — you can save them for next time.'
-              : 'Pick a saved ${type.accountLabel.toLowerCase()} or add a new one.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
-        ),
-        Gaps.xl,
-        for (final account in accounts) ...[
-          SelectionTile(
-            selected: !_enterNew && _selectedAccount?.id == account.id,
-            onTap: () => setState(() {
-              _choose(account);
-              _lookup = null;
-              _meterNumber = null;
-            }),
-            title: account.nickname,
-            subtitle:
-                '${Fmt.masked(account.accountNumber)}'
-                '${account.lastPaidAt != null ? ' • ${Fmt.lastPaidLabel(account.lastPaidAt!)}' : ''}',
-            leading: BillerMark(type, size: 40, network: account.network),
-            trailing: account.isDefault
-                ? const StatusBadge(label: 'Default', tone: BadgeTone.success)
-                : null,
-          ),
-          Gaps.md,
-        ],
-        SelectionTile(
-          selected: _enterNew,
-          onTap: () => setState(() {
-            _enterNew = true;
-            _selectedAccount = null;
-            _lookup = null;
-            _meterNumber = null;
-          }),
-          title: type.isPhoneAccount
-              ? 'New phone number'
-              : 'New ${type.accountLabel.toLowerCase()}',
-          subtitle: 'Enter details manually',
-          leading: const TintedIcon(Icons.add_rounded, size: 40),
-        ),
-        if (_enterNew) ...[
-          Gaps.xl,
-          Form(
-            key: _newAccountForm,
+        PayCard(
+          child: Form(
+            key: _form,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(title, style: AppText.title.copyWith(fontSize: 22)),
+                Gaps.sm,
+                Text(type.accountPrompt, style: AppText.bodyMuted),
+                Gaps.xl,
+                if (type.isPhoneAccount && _payerPhone.isNotEmpty) ...[
+                  _SwitchRow(
+                    label: 'Use my number',
+                    value: _useMyNumber,
+                    onChanged: _toggleMyNumber,
+                  ),
+                  Gaps.md,
+                ],
                 TextFormField(
                   controller: _numberCtrl,
+                  readOnly: _useMyNumber,
                   keyboardType: type.allowsLetters
                       ? TextInputType.text
-                      : TextInputType.number,
+                      : TextInputType.phone,
                   textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(
                       type.allowsLetters
                           ? RegExp(r'[A-Za-z\d\s]')
-                          : RegExp(r'[\d\s]'),
+                          : RegExp(r'[\d\s+]'),
                     ),
                   ],
-                  decoration: InputDecoration(
-                    labelText: type.accountLabel,
-                    hintText: type.accountHint,
+                  style: AppText.body.copyWith(
+                    fontSize: 17,
+                    fontFeatures: AppText.tabularFigures,
+                    color: _useMyNumber ? AppColors.muted : AppColors.ink,
                   ),
-                  onChanged: (value) => setState(() {
-                    _lookup = null;
-                    _meterNumber = null;
-                    if (type.isPhoneAccount) {
-                      _network = MobileNetwork.guess(value) ?? _network;
-                    }
+                  decoration: InputDecoration(
+                    labelText: type.isPhoneAccount
+                        ? 'Recipient ${network?.label ?? ''} number'
+                        : type.accountLabel,
+                    hintText: type.accountHint,
+                    fillColor: _useMyNumber
+                        ? AppColors.surfaceSubtle
+                        : AppColors.surface,
+                  ),
+                  onChanged: (_) => setState(() {
+                    _numberChanged();
+                    _contactName = null;
                   }),
+                  onFieldSubmitted: (_) => _continue(),
                   validator: (v) => Validators.account(v, type),
                 ),
-                Gaps.lg,
-                TextFormField(
-                  controller: _nicknameCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Nickname (optional)',
-                    hintText: "e.g. My Home, Mum's House",
+                if (guessed != null &&
+                    network != null &&
+                    guessed != network) ...[
+                  Gaps.sm,
+                  Text(
+                    'This looks like a ${guessed.label} number. If it moved '
+                    'to ${network.label}, carry on.',
+                    style: AppText.caption.copyWith(
+                      color: AppColors.warningText,
+                    ),
                   ),
-                ),
-                if (type == UtilityType.ecg)
-                  SwitchListTile(
+                ],
+                if (type == UtilityType.ecg && _selectedAccount == null) ...[
+                  Gaps.md,
+                  _SwitchRow(
+                    label: 'This is a postpaid meter',
                     value: _postpaid,
                     onChanged: (v) => setState(() {
                       _postpaid = v;
                       _lookup = null;
                     }),
-                    title: Text(
-                      'This is a postpaid account',
-                      style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+                if (_selectedAccount == null) ...[
+                  Gaps.xs,
+                  _SwitchRow(
+                    label: 'Save for next time',
+                    value: _saveNew,
+                    onChanged: (v) => setState(() => _saveNew = v),
+                  ),
+                ],
+                if (type.isPhoneAccount) ...[
+                  Gaps.sm,
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _pickContact,
+                      icon: const Icon(Icons.person_search_rounded, size: 22),
+                      label: const Text('Choose from contacts'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        textStyle: AppText.subtitle.copyWith(fontSize: 15.5),
+                      ),
                     ),
-                    contentPadding: EdgeInsets.zero,
-                    activeTrackColor: AppColors.navy,
                   ),
-                SwitchListTile(
-                  value: _saveNew,
-                  onChanged: (v) => setState(() => _saveNew = v),
-                  title: Text(
-                    'Save for next time',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  activeTrackColor: AppColors.navy,
-                ),
+                ],
               ],
             ),
           ),
-        ],
-        if (type.isPhoneAccount && (_enterNew || _selectedAccount != null)) ...[
-          Gaps.lg,
-          Text('Network', style: theme.textTheme.titleSmall),
-          Gaps.sm,
-          _NetworkPicker(
-            selected: _network,
-            onSelected: (n) => setState(() {
-              _network = n;
-              _lookup = null;
-            }),
+        ),
+        if (saved.isNotEmpty) ...[
+          Gaps.xxl,
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: Insets.md),
+            child: Text(
+              type.isPhoneAccount ? 'SAVED NUMBERS' : 'SAVED',
+              style: AppText.overline,
+            ),
+          ),
+          PayCard(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              children: [
+                for (var i = 0; i < saved.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, indent: 72, endIndent: 16),
+                  _SavedRow(
+                    account: saved[i],
+                    selected: _selectedAccount?.id == saved[i].id,
+                    onTap: _busy
+                        ? null
+                        : () {
+                            setState(() => _choose(saved[i]));
+                            _continue();
+                          },
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ],
     );
   }
 
-  // Step 2 — amount or bundle -----------------------------------------------
+  // Step 2 — amount -----------------------------------------------------------
 
   Widget _buildAmountStep() {
-    final theme = Theme.of(context);
-    final property = ref.watch(propertyByIdProvider(_propertyId));
     final lookup = _lookup;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          type.isPlanBased ? 'Choose a bundle' : 'How much?',
-          style: theme.textTheme.headlineMedium,
-        ),
-        Gaps.lg,
-        _PayingForCard(
-          type: type,
-          nickname: lookup?.customerName.isNotEmpty ?? false
-              ? lookup!.customerName
-              : _accountNickname,
-          number: lookup?.accountNumber ?? _accountNumber,
-          network: _network,
-          property: type.isPhoneAccount ? null : property,
-          onChangeProperty: type.isPhoneAccount ? null : _pickProperty,
-        ),
-        if (lookup != null &&
-            !lookup.nameConfirmed &&
-            !type.isPhoneAccount) ...[
-          Gaps.md,
-          InfoBanner.warning(
-            message:
-                '${type.providerName} couldn\'t confirm who this ${type.accountLabel.toLowerCase()} '
-                'belongs to. Check the number before you pay.',
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        Insets.xl,
+        Insets.md,
+        Insets.xl,
+        Insets.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PayHeading(
+            type == UtilityType.airtime ? 'How much airtime?' : 'How much?',
           ),
-        ],
-        Gaps.xl,
-        if (type.isPlanBased)
-          ..._buildBundleChoices()
-        else ...[
-          if (lookup?.amountDue case final due? when due > 0) ...[
-            Text(
-              'Amount due: ${Fmt.cedis(due)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.muted,
-              ),
+          if (lookup != null &&
+              !lookup.nameConfirmed &&
+              !type.isPhoneAccount) ...[
+            Gaps.lg,
+            InfoBanner.warning(
+              message:
+                  '${type.providerName} couldn\'t confirm who this '
+                  '${type.accountLabel.toLowerCase()} belongs to. Check the '
+                  'number before you pay.',
             ),
-            Gaps.md,
           ],
+          if (lookup?.amountDue case final due? when due > 0) ...[
+            Gaps.md,
+            Text('Amount due: ${Fmt.cedis(due)}', style: AppText.bodyMuted),
+          ],
+          const SizedBox(height: 44),
           AmountField(
             controller: _amountCtrl,
+            underline: true,
             quickAmounts: [
               for (final q in type.quickAmounts)
                 if (q <= _maxAmount) q,
@@ -611,39 +794,205 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
             Text(
               _amountError!,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: AppText.caption.copyWith(
                 color: AppColors.danger,
+                fontSize: 13.5,
               ),
             ),
           ],
         ],
-      ],
+      ),
     );
   }
 
-  List<Widget> _buildBundleChoices() {
+  // Step 2 — bundle -----------------------------------------------------------
+
+  Widget _buildBundleStep() {
     final bundles = _lookup?.bundles ?? const <BillBundle>[];
-    if (bundles.isEmpty) {
-      return [
-        const InfoBanner.warning(
-          message: 'No bundles are available for this number right now.',
-        ),
-      ];
-    }
-    return [
-      for (final bundle in bundles) ...[
-        SelectionTile(
-          selected: _bundle == bundle,
-          onTap: () => setState(() => _bundle = bundle),
-          title: bundle.label,
-          trailing: Text(
-            Fmt.cedis(bundle.amount),
-            style: Theme.of(context).textTheme.titleMedium,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        Insets.xl,
+        Insets.md,
+        Insets.xl,
+        Insets.xl,
+      ),
+      children: [
+        const PayHeading('Choose a bundle'),
+        Gaps.xl,
+        if (bundles.isEmpty)
+          const InfoBanner.warning(
+            message: 'No bundles are available for this number right now.',
+          )
+        else
+          BundleGrid(
+            bundles: bundles,
+            selected: _bundle,
+            onSelected: (bundle) {
+              setState(() => _bundle = bundle);
+              _confirm();
+            },
           ),
-        ),
-        Gaps.md,
       ],
-    ];
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+extension on UtilityType {
+  /// "Airtime amount", "Top-up amount" — what the money is called.
+  String get shortNoun => switch (this) {
+    UtilityType.airtime => 'Airtime',
+    UtilityType.ecg || UtilityType.internet => 'Top-up',
+    _ => 'Bill',
+  };
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => MergeSemantics(
+    child: InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: Corners.smRadius,
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: AppText.body)),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: AppColors.navy,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SavedRow extends StatelessWidget {
+  const _SavedRow({
+    required this.account,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final UtilityAccount account;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final number = account.type.isPhoneAccount
+        ? Fmt.ghanaPhone(account.accountNumber)
+        : account.accountNumber;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            BillerMark(account.type, size: 40, network: account.network),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    account.nickname,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.subtitle,
+                  ),
+                  Text(
+                    account.lastPaidAt == null
+                        ? number
+                        : '$number · ${Fmt.lastPaidLabel(account.lastPaidAt!)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(
+                      fontFeatures: AppText.tabularFigures,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.chevron_right_rounded,
+              color: selected ? AppColors.navy : AppColors.faint,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+typedef _Confirmed = ({MobileNetwork wallet, String? propertyId});
+
+/// The last look before paying: the wallet that will be prompted, what is
+/// being paid for, and the amount, with one button that says what it does.
+class _ConfirmSheet extends ConsumerStatefulWidget {
+  const _ConfirmSheet({
+    required this.type,
+    required this.amount,
+    required this.chargePercent,
+    required this.wallet,
+    required this.payerPhone,
+    required this.payerName,
+    required this.propertyId,
+    required this.rows,
+  });
+
+  final UtilityType type;
+  final double amount;
+  final double chargePercent;
+  final MobileNetwork wallet;
+  final String payerPhone;
+  final String payerName;
+
+  /// The home the bill belongs to; null for airtime and data.
+  final String? propertyId;
+  final List<(String, String)> rows;
+
+  @override
+  ConsumerState<_ConfirmSheet> createState() => _ConfirmSheetState();
+}
+
+class _ConfirmSheetState extends ConsumerState<_ConfirmSheet> {
+  late MobileNetwork _wallet = widget.wallet;
+  late String? _propertyId = widget.propertyId;
+
+  Future<void> _pickWallet() async {
+    final selected = await showAppBottomSheet<MobileNetwork>(
+      context,
+      title: 'Which wallet is on your number?',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final n in MobileNetwork.values) ...[
+            SelectionTile(
+              selected: n == _wallet,
+              onTap: () => Navigator.of(context).pop(n),
+              title: n.walletLabel,
+              leading: NetworkMark(n),
+            ),
+            Gaps.md,
+          ],
+        ],
+      ),
+    );
+    if (selected != null) setState(() => _wallet = selected);
   }
 
   Future<void> _pickProperty() async {
@@ -670,162 +1019,137 @@ class _PaymentFlowScreenState extends ConsumerState<PaymentFlowScreen> {
     if (selected != null) setState(() => _propertyId = selected);
   }
 
-  Future<String?> _pickMeter(List<MeterChoice> meters) =>
-      showAppBottomSheet<String>(
-        context,
-        title: 'Which meter?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final m in meters) ...[
-              SelectionTile(
-                selected: false,
-                onTap: () => Navigator.of(context).pop(m.meterNumber),
-                title: m.customerName.isEmpty ? m.meterNumber : m.customerName,
-                subtitle: m.meterNumber,
-                leading: BillerMark(type, size: 40),
-              ),
-              Gaps.md,
-            ],
-          ],
-        ),
-      );
-
-  Future<void> _pickWallet() async {
-    final selected = await showAppBottomSheet<MobileNetwork>(
-      context,
-      title: 'Which wallet is on your number?',
+  @override
+  Widget build(BuildContext context) {
+    final property = ref.watch(propertyByIdProvider(_propertyId));
+    final charge = widget.chargePercent;
+    final name = widget.payerName.trim();
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        Insets.xl,
+        Insets.lg,
+        Insets.xl,
+        MediaQuery.paddingOf(context).bottom + Insets.xl,
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final n in MobileNetwork.values) ...[
-            SelectionTile(
-              selected: n == _wallet,
-              onTap: () => Navigator.of(context).pop(n),
-              title: n.walletLabel,
-              leading: NetworkMark(n),
-            ),
-            Gaps.md,
-          ],
-        ],
-      ),
-    );
-    if (selected != null) setState(() => _wallet = selected);
-  }
-
-  // Step 3 — review ---------------------------------------------------------
-
-  Widget _buildReviewStep() {
-    final theme = Theme.of(context);
-    final property = ref.watch(propertyByIdProvider(_propertyId));
-    final amount = _amount ?? 0;
-    final lookup = _lookup;
-    final chargePercent = lookup?.chargePercent ?? 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Review your payment', style: theme.textTheme.headlineMedium),
-        Gaps.sm,
-        Text(
-          'Check everything before you confirm.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.muted),
-        ),
-        Gaps.xl,
-        AppCard(
-          padding: const EdgeInsets.all(Insets.xl),
-          child: Column(
+          Row(
             children: [
-              BillerMark(type, size: 52, network: _network),
-              Gaps.md,
-              Text(Fmt.cedis(amount), style: theme.textTheme.displaySmall),
-              Text(
-                type.label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.muted,
+              Expanded(child: Text('Confirm payment', style: AppText.title)),
+              NavChip(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icons.close_rounded,
+                tooltip: 'Close',
+              ),
+            ],
+          ),
+          Gaps.lg,
+          Semantics(
+            button: true,
+            label:
+                'Pay from ${_wallet.walletLabel}, '
+                '${Fmt.ghanaPhone(widget.payerPhone)}. Change wallet',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: _pickWallet,
+              borderRadius: Corners.lgRadius,
+              child: Container(
+                padding: const EdgeInsets.all(Insets.md),
+                decoration: BoxDecoration(
+                  borderRadius: Corners.lgRadius,
+                  border: Border.all(color: AppColors.lineStrong),
+                ),
+                child: Row(
+                  children: [
+                    NetworkMark(_wallet, size: 48),
+                    Gaps.lg,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            Fmt.ghanaPhone(widget.payerPhone),
+                            style: AppText.heading.copyWith(
+                              fontFeatures: AppText.tabularFigures,
+                            ),
+                          ),
+                          Text(
+                            name.isEmpty
+                                ? _wallet.walletLabel
+                                : '${_wallet.walletLabel} · $name',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.caption.copyWith(fontSize: 13.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.edit_outlined, color: AppColors.ink),
+                    ),
+                  ],
                 ),
               ),
-              Gaps.lg,
-              const DashedDivider(),
-              Gaps.sm,
-              ReceiptRow(
-                label: type.accountLabel,
-                value: lookup?.accountNumber ?? _accountNumber,
-              ),
-              if (lookup != null && lookup.customerName.isNotEmpty)
-                ReceiptRow(label: 'Name', value: lookup.customerName),
-              ReceiptRow(label: 'Nickname', value: _accountNickname),
-              if (_bundle != null)
-                ReceiptRow(label: 'Bundle', value: _bundle!.label),
-              if (property != null && !type.isPhoneAccount)
-                ReceiptRow(label: 'Home', value: property.nickname),
-              ReceiptRow(
-                label: 'Pay from',
-                value: '',
-                valueWidget: Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _pickWallet,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                    ),
-                    child: Text(
-                      '${_wallet?.walletLabel ?? 'Choose'} • ${Fmt.ghanaPhone(_payerPhone)}',
-                      textAlign: TextAlign.right,
+            ),
+          ),
+          Gaps.xl,
+          for (final (label, value) in widget.rows)
+            PaySummaryRow(label: label, value: value),
+          if (property != null)
+            PaySummaryRow(
+              label: 'For',
+              value: property.nickname,
+              trailing: InkWell(
+                onTap: _pickProperty,
+                borderRadius: Corners.smRadius,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    'Change',
+                    style: AppText.body.copyWith(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
-              ReceiptRow(label: 'GRID fee', value: 'Free'),
-              ReceiptRow(
-                label: 'Network charge',
-                value: chargePercent > 0
-                    ? 'About ${chargePercent.toStringAsFixed(chargePercent % 1 == 0 ? 0 : 1)}%'
-                    : 'Shown on the prompt',
-              ),
-              const Divider(height: Insets.xl),
-              ReceiptRow(
-                label: 'Total',
-                value: Fmt.cedis(amount),
-                emphasize: true,
-              ),
-            ],
+            ),
+          const PaySummaryRow(
+            label: 'GRID fee',
+            value: 'Free',
+            valueColor: AppColors.success,
           ),
-        ),
-        Gaps.lg,
-        InfoBanner(
-          icon: Icons.phone_iphone_rounded,
-          message:
-              'You\'ll get a prompt on ${Fmt.ghanaPhone(_payerPhone)} to approve this payment with your MoMo PIN.',
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-
-class _NetworkPicker extends StatelessWidget {
-  const _NetworkPicker({required this.selected, required this.onSelected});
-
-  final MobileNetwork? selected;
-  final ValueChanged<MobileNetwork> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: Insets.sm,
-      children: [
-        for (final n in MobileNetwork.values)
-          ChoiceChip(
-            avatar: NetworkMark(n, size: 20),
-            showCheckmark: false,
-            label: Text(n.label),
-            selected: n == selected,
-            onSelected: (_) => onSelected(n),
+          PaySummaryRow(
+            label: 'Network charge',
+            value: charge > 0
+                ? 'About ${charge.toStringAsFixed(charge % 1 == 0 ? 0 : 1)}%'
+                : 'Shown on the prompt',
+            valueColor: AppColors.muted,
           ),
-      ],
+          const Divider(height: 28),
+          PaySummaryRow(
+            label: 'Amount to pay',
+            value: Fmt.cedis(widget.amount),
+            strong: true,
+          ),
+          Gaps.xl,
+          PrimaryButton(
+            label: 'Pay ${Fmt.cedis(widget.amount)}',
+            onPressed: () => Navigator.of(
+              context,
+            ).pop<_Confirmed>((wallet: _wallet, propertyId: _propertyId)),
+          ),
+          Gaps.md,
+          Text(
+            'You\'ll approve it with your MoMo PIN.',
+            textAlign: TextAlign.center,
+            style: AppText.caption,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -833,22 +1157,26 @@ class _NetworkPicker extends StatelessWidget {
 /// Waits for the customer to approve the prompt, then for the biller.
 /// Polls the order with a short, steady interval; after a few minutes it
 /// hands back whatever state the order is in so the customer isn't stuck.
-class _ApprovalView extends ConsumerStatefulWidget {
-  const _ApprovalView({
+class _ApprovalPoller extends ConsumerStatefulWidget {
+  const _ApprovalPoller({
     required this.order,
     required this.payerPhone,
+    required this.wallet,
     required this.onSettled,
+    required this.onLeave,
   });
 
   final BillOrder order;
   final String payerPhone;
+  final MobileNetwork wallet;
   final ValueChanged<BillOrder> onSettled;
+  final VoidCallback onLeave;
 
   @override
-  ConsumerState<_ApprovalView> createState() => _ApprovalViewState();
+  ConsumerState<_ApprovalPoller> createState() => _ApprovalPollerState();
 }
 
-class _ApprovalViewState extends ConsumerState<_ApprovalView> {
+class _ApprovalPollerState extends ConsumerState<_ApprovalPoller> {
   static const _interval = Duration(seconds: 3);
   static const _giveUpAfter = Duration(minutes: 3);
 
@@ -893,149 +1221,17 @@ class _ApprovalViewState extends ConsumerState<_ApprovalView> {
   Widget build(BuildContext context) {
     final paid = _order.status == BillOrderStatus.processing;
     final amount = _order.amountCharged ?? _order.total;
-    return _WaitingView(
+    return PayPendingView(
       title: paid ? 'Payment received' : 'Approve on your phone',
       message: paid
-          ? 'Paying ${_order.type.providerName}…'
-          : 'Check ${Fmt.ghanaPhone(widget.payerPhone)} for a ${_order.walletLabel} prompt '
-                'for ${Fmt.cedis(amount)} and enter your PIN.',
-      footer: [
-        TextButton(
-          onPressed: _check,
-          child: Text(paid ? 'Check again' : 'I\'ve approved it'),
-        ),
-        TextButton(
-          onPressed: () {
-            unawaited(ref.read(transactionsProvider.notifier).refresh());
-            context.go(Routes.activity);
-          },
-          child: const Text('Continue in Activity'),
-        ),
-      ],
-    );
-  }
-}
-
-class _WaitingView extends StatelessWidget {
-  const _WaitingView({
-    required this.title,
-    required this.message,
-    this.footer = const [],
-  });
-
-  final String title;
-  final String message;
-  final List<Widget> footer;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(Insets.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    color: AppColors.navy,
-                  ),
-                ),
-                Gaps.xxl,
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall,
-                ),
-                Gaps.sm,
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.muted,
-                  ),
-                ),
-                if (footer.isNotEmpty) ...[Gaps.xl, ...footer],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PayingForCard extends StatelessWidget {
-  const _PayingForCard({
-    required this.type,
-    required this.nickname,
-    required this.number,
-    required this.property,
-    this.network,
-    this.onChangeProperty,
-  });
-
-  final UtilityType type;
-  final MobileNetwork? network;
-  final String nickname;
-  final String number;
-  final Property? property;
-  final VoidCallback? onChangeProperty;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(Insets.lg),
-      decoration: BoxDecoration(
-        color: BillerBrand.resolve(type, network).tint,
-        borderRadius: Corners.lgRadius,
-      ),
-      child: Row(
-        children: [
-          BillerMark(type, size: 40, network: network),
-          Gaps.md,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(nickname, style: theme.textTheme.titleMedium),
-                Text(
-                  number.isEmpty ? type.accountHint : Fmt.masked(number),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (property != null && onChangeProperty != null)
-            TextButton.icon(
-              onPressed: onChangeProperty,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: Insets.sm),
-              ),
-              icon: const Icon(Icons.home_outlined, size: 16),
-              label: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 88),
-                child: Text(
-                  property!.nickname,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.navy,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+          ? 'We\'re paying ${_order.type.providerName} now. This usually '
+                'takes a few seconds.'
+          : 'To finish paying ${Fmt.cedis(amount)}, enter your '
+                '${_order.walletLabel} PIN in the prompt sent to:',
+      phone: paid ? null : widget.payerPhone,
+      wallet: MobileNetwork.fromChannel(_order.channel) ?? widget.wallet,
+      approved: paid,
+      onClose: widget.onLeave,
     );
   }
 }

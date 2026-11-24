@@ -102,9 +102,9 @@ abstract final class AppText {
   static const button = TextStyle(
     fontFamily: _f,
     fontFamilyFallback: kFontFallback,
-    fontSize: 15,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.1,
   );
   static const amountXL = TextStyle(
     fontFamily: _f,
@@ -303,15 +303,14 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: Corners.rowRadius),
       ),
-      // Solid, squared navy actions. Labels are set in capitals by
-      // PrimaryButton / SecondaryButton.
+      // Solid navy for the one action; a quiet grey fill for the alternative.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.navy,
           foregroundColor: AppColors.onNavy,
           disabledBackgroundColor: AppColors.disabledFill,
           disabledForegroundColor: AppColors.faint,
-          minimumSize: const Size.fromHeight(54),
+          minimumSize: const Size.fromHeight(56),
           padding: const EdgeInsets.symmetric(horizontal: Insets.xxl),
           elevation: 0,
           shape: const RoundedRectangleBorder(borderRadius: Corners.smRadius),
@@ -320,11 +319,11 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.navy,
-          backgroundColor: AppColors.surface,
-          minimumSize: const Size.fromHeight(54),
+          foregroundColor: AppColors.ink,
+          backgroundColor: AppColors.chip,
+          minimumSize: const Size.fromHeight(56),
           padding: const EdgeInsets.symmetric(horizontal: Insets.xxl),
-          side: const BorderSide(color: AppColors.navy, width: 1.4),
+          side: BorderSide.none,
           shape: const RoundedRectangleBorder(borderRadius: Corners.smRadius),
           textStyle: AppText.button,
         ),
@@ -410,9 +409,7 @@ abstract final class AppTheme {
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.canvas,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: Corners.sheetTop),
         showDragHandle: true,
         dragHandleColor: AppColors.lineStrong,
         dragHandleSize: Size(44, 5),

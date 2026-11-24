@@ -49,7 +49,7 @@ class PrimaryButton extends StatelessWidget {
   );
 }
 
-/// White button with a navy outline, for the alternative to the primary.
+/// Quiet grey-filled button, for the alternative to the primary.
 class SecondaryButton extends StatelessWidget {
   const SecondaryButton({
     super.key,
@@ -70,9 +70,7 @@ class SecondaryButton extends StatelessWidget {
     onPressed: onPressed,
     style: OutlinedButton.styleFrom(
       foregroundColor: danger ? AppColors.danger : null,
-      side: danger
-          ? const BorderSide(color: AppColors.dangerLine, width: 1.4)
-          : null,
+      backgroundColor: danger ? AppColors.dangerBg : null,
       minimumSize: expand ? null : const Size(0, 44),
       padding: expand
           ? null
@@ -94,11 +92,7 @@ class _ButtonLabel extends StatelessWidget {
     children: [
       if (icon != null) ...[Icon(icon, size: 19), const SizedBox(width: 8)],
       Flexible(
-        child: Text(
-          label.toUpperCase(),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
     ],
   );
@@ -142,14 +136,14 @@ class OnNavyButton extends StatelessWidget {
   Widget build(BuildContext context) => Material(
     color: filled ? Colors.white : Colors.transparent,
     shape: RoundedRectangleBorder(
-      borderRadius: Corners.smRadius,
+      borderRadius: Corners.pill,
       side: filled
           ? BorderSide.none
           : const BorderSide(color: AppColors.onNavyLine, width: 1.4),
     ),
     child: InkWell(
       onTap: onPressed,
-      borderRadius: Corners.smRadius,
+      borderRadius: Corners.pill,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -157,7 +151,7 @@ class OnNavyButton extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                label.toUpperCase(),
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppText.button.copyWith(
@@ -488,7 +482,7 @@ class NavyPanel extends StatelessWidget {
   );
 }
 
-/// Bordered group of label/value rows separated by hairlines.
+/// Soft grey panel of label/value rows separated by hairlines.
 class DetailGroup extends StatelessWidget {
   const DetailGroup({super.key, required this.rows});
   final List<Widget> rows;
@@ -496,15 +490,18 @@ class DetailGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: Corners.mdRadius,
-      border: Border.all(color: AppColors.line),
+      color: AppColors.surfaceSubtle,
+      borderRadius: Corners.lgRadius,
     ),
     child: Column(
       children: [
         for (var i = 0; i < rows.length; i++) ...[
           rows[i],
-          if (i != rows.length - 1) const Divider(height: 1),
+          if (i != rows.length - 1)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Divider(height: 1),
+            ),
         ],
       ],
     ),
@@ -578,31 +575,20 @@ class DetailRow extends StatelessWidget {
   }
 }
 
-/// A settings-style list: rows with an icon tile, a label and a chevron.
+/// A settings-style list: open rows with a line icon, a label and a
+/// chevron, separated by hairlines. No box around them.
 class MenuGroup extends StatelessWidget {
   const MenuGroup({super.key, required this.children});
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Container(
-    clipBehavior: Clip.antiAlias,
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: Corners.lgRadius,
-      border: Border.all(color: AppColors.line),
-    ),
-    child: Column(
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          children[i],
-          if (i != children.length - 1)
-            const Padding(
-              padding: EdgeInsets.only(left: 68),
-              child: Divider(height: 1),
-            ),
-        ],
+  Widget build(BuildContext context) => Column(
+    children: [
+      for (var i = 0; i < children.length; i++) ...[
+        children[i],
+        if (i != children.length - 1) const Divider(height: 1),
       ],
-    ),
+    ],
   );
 }
 
@@ -627,23 +613,15 @@ class MenuRow extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(2, 17, 0, 17),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: danger ? AppColors.dangerBg : AppColors.surfaceSubtle,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              size: 21,
-              color: danger ? AppColors.danger : AppColors.ink,
-            ),
+          Icon(
+            icon,
+            size: 25,
+            color: danger ? AppColors.danger : AppColors.ink,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,8 +630,8 @@ class MenuRow extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppText.subtitle.copyWith(
-                    fontWeight: FontWeight.w500,
+                  style: AppText.body.copyWith(
+                    fontSize: 16,
                     color: danger ? AppColors.danger : AppColors.ink,
                   ),
                 ),
@@ -669,11 +647,14 @@ class MenuRow extends StatelessWidget {
           ),
           if (value != null) ...[
             const SizedBox(width: 8),
-            Flexible(
+            // Capped rather than flexible, so the value hugs the chevron.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 150),
               child: Text(
                 value!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
                 style: AppText.caption.copyWith(fontSize: 13.5),
               ),
             ),
@@ -739,7 +720,7 @@ class InitialsAvatar extends StatelessWidget {
     alignment: Alignment.center,
     decoration: BoxDecoration(
       color: onNavy ? Colors.white : AppColors.navySoft,
-      borderRadius: BorderRadius.circular(size * 0.3),
+      shape: BoxShape.circle,
     ),
     child: Text(
       initials,
@@ -849,8 +830,7 @@ class StatusBanner extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
     decoration: BoxDecoration(
       color: tone.background,
-      borderRadius: Corners.mdRadius,
-      border: Border.all(color: tone.border.withValues(alpha: 0.6)),
+      borderRadius: Corners.lgRadius,
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1110,4 +1090,107 @@ class GridGlyph extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A white pill floating over the page: the figure the decision is about on
+/// the left, the one action on the right. Used where the choice is about a
+/// price — continuing to book, paying.
+class FloatingActionBar extends StatelessWidget {
+  const FloatingActionBar({
+    super.key,
+    required this.title,
+    required this.label,
+    required this.onPressed,
+    this.caption,
+    this.busy = false,
+    this.busyLabel = 'Working',
+  });
+
+  final String title;
+  final String? caption;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+  final String busyLabel;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(22, 10, 10, 10),
+    decoration: const BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: Corners.pill,
+      boxShadow: AppColors.liftedShadow,
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  style: AppText.subtitle.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: AppText.tabularFigures,
+                  ),
+                ),
+              ),
+              if (caption != null)
+                Text(
+                  caption!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(
+          onPressed: busy ? null : onPressed,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 52),
+            padding: const EdgeInsets.symmetric(horizontal: 26),
+            shape: const StadiumBorder(),
+          ),
+          child: busy
+              ? ButtonSpinner(label: busyLabel, onPrimary: false)
+              : Text(label, maxLines: 1),
+        ),
+      ],
+    ),
+  );
+}
+
+/// An underlined text action: the quiet alternative under a paragraph or
+/// beside a [FloatingActionBar].
+class TextLink extends StatelessWidget {
+  const TextLink({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.color = AppColors.ink,
+  });
+  final String label;
+  final VoidCallback? onPressed;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: onPressed,
+    style: TextButton.styleFrom(foregroundColor: color),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.underline,
+      ),
+    ),
+  );
 }

@@ -19,17 +19,18 @@ abstract final class Insets {
 /// everywhere. Radius signals importance: the further a surface is from the
 /// page, the rounder it gets.
 ///
-///   [row]    list rows and inline blocks — the app's most common surface
+///   [sm]     buttons — soft, but still a rectangle
 ///   [input]  text fields
-///   [lg]     panels and grouped blocks
-///   [xl]     reserved for the hero and the sheet-over-ground junction
+///   [row]    filled panels and inline blocks
+///   [lg]     raised cards
+///   [xl]     heroes, floating bars and sheets
 abstract final class Corners {
-  static const double sm = 8;
-  static const double input = 8;
-  static const double row = 12;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 22;
+  static const double sm = 14;
+  static const double input = 14;
+  static const double row = 16;
+  static const double md = 16;
+  static const double lg = 22;
+  static const double xl = 28;
 
   static const BorderRadius smRadius = BorderRadius.all(Radius.circular(sm));
   static const BorderRadius inputRadius = BorderRadius.all(
